@@ -29,7 +29,8 @@ The calls are tall tales that tech workers have passed around for years. Most of
 | 1 | the AI that built it, tapping through all 15 calls on a phone-sized screen | Nowhere in the game, but the sides of the pictures were cut off on a phone. | Made each picture shrink to fit the width of a narrow screen. |
 | 2 | me | Nowhere, but the picture behind each call gave the answer away. | Drew all four endings into every picture, so the picture no longer points to one of them. |
 | 3 | me | Nowhere, but the pictures still pointed at the answers, and they all sat at the top. | Swapped each picture for a plain object that only nods at its ending, scattered the four around the call at random, and added a phone ring and the caller's voice, with a button to turn them off. |
-| 4 |  |  |  |
+| 4 | my younger daughter | She got an answer wrong and was confused that she could not change it. | Nothing yet. |
+| 5 |  |  |  |
 
 ## Made with
 
