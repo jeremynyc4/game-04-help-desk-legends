@@ -105,7 +105,7 @@
   }
 
   /* The gap that lets the picture show above the card. */
-  .peek.tall { flex: 0 0 auto; height: max(130px, calc(var(--desk-line) - 76px)); }
+  .peek.tall { flex: 0 0 auto; height: max(130px, calc(var(--desk-line) - 156px)); }
 
   .panel {
     background: rgba(255, 249, 236, 0.95);
@@ -310,6 +310,26 @@
     background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0, rgba(0, 0, 0, 0.28) 1px, transparent 1px, transparent 3px);
   }
 
+  /* The ABCDaGames sign at the top of the page. Tapping it goes back to the home page for all the games. */
+  .home-sign {
+    display: inline-block;
+    position: relative;
+    z-index: 1;
+    margin-bottom: 14px;
+    padding: 8px 14px 9px;
+    background: var(--paper, #FFF9EC);
+    color: var(--ink, #2B2A33);
+    border: 3px solid var(--ink, #2B2A33);
+    border-radius: 14px;
+    box-shadow: 4px 4px 0 var(--ink, #2B2A33);
+    text-decoration: none;
+    line-height: 1.15;
+    font-family: ui-rounded, "Arial Rounded MT Bold", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  }
+
+  .home-sign b { display: block; font-size: 24px; letter-spacing: -0.3px; }
+  .home-sign i { display: block; font-style: normal; font-size: 13px; color: var(--muted, #5F5B6B); }
+
   @keyframes pop {
     0% { transform: scale(1); }
     40% { transform: scale(1.05) rotate(-1deg); }
@@ -336,6 +356,7 @@
 <div class="scene" id="scene" aria-hidden="true"></div>
 
 <main class="app">
+  <a class="home-sign" href="https://jeremynyc4.github.io/games/"><b>ABCDaGames</b><i>Small games to play in a browser. Tap one to play.</i></a>
   <header class="bar" id="bar">
     <div class="readout" id="readout" aria-hidden="true"></div>
     <button class="sound" id="sound" type="button" aria-pressed="true">Sound On</button>
