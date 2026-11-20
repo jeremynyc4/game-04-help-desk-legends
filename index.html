@@ -79,8 +79,9 @@
 
   .bar {
     display: flex;
-    justify-content: space-between;
+    align-items: center;
     gap: 8px;
+    min-height: 48px;
     font-family: var(--font-mono);
     font-size: 14px;
     font-weight: 700;
@@ -94,8 +95,7 @@
   }
 
   /* The gap that lets the picture show above the card. */
-  .peek { flex: 0 0 auto; height: max(110px, calc(var(--desk-line) - 50px)); }
-  .peek.tall { height: max(130px, calc(var(--desk-line) - 16px)); }
+  .peek.tall { flex: 0 0 auto; height: max(130px, calc(var(--desk-line) - 76px)); }
 
   .panel {
     background: rgba(255, 249, 236, 0.95);
@@ -234,6 +234,27 @@
   .score-big { font-family: var(--font-display); font-size: 56px; font-weight: 700; line-height: 1; margin: 6px 0 2px; }
   .rank { font-family: var(--font-display); font-size: 24px; font-weight: 700; color: var(--teal-deep); margin-bottom: 6px; }
 
+  .sound {
+    margin-left: auto;
+    min-height: 48px;
+    padding: 0 14px;
+    background: var(--paper);
+    border: 3px solid var(--ink);
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .sound[aria-pressed="false"] { background: var(--paper-soft); color: var(--muted); }
+
+  /* The four small pictures for a call sit in three rows of two places, above, between, and below the two cards, and tuck a little way behind them. */
+  .panel { position: relative; z-index: 1; }
+  .pics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; height: 104px; margin: -3px 0; position: relative; z-index: 0; }
+  .pics:first-of-type { margin-top: 4px; }
+  .pic { display: grid; place-items: center; min-width: 0; }
+  .pic svg { height: 98px; width: auto; max-width: 100%; display: block; overflow: visible; }
+
   @keyframes pop {
     0% { transform: scale(1); }
     40% { transform: scale(1.05) rotate(-1deg); }
@@ -251,7 +272,6 @@
   }
 
   @media (max-height: 640px) {
-    .peek { height: 110px; }
     .peek.tall { height: 130px; }
   }
 </style>
@@ -261,9 +281,10 @@
 <div class="scene" id="scene" aria-hidden="true"></div>
 
 <main class="app">
-  <header class="bar" id="bar" hidden>
-    <span id="call-count"></span>
-    <span id="score"></span>
+  <header class="bar" id="bar">
+    <span id="call-count" hidden></span>
+    <span id="score" hidden></span>
+    <button class="sound" id="sound" type="button" aria-pressed="true">Sound On</button>
   </header>
 
   <section id="screen-start">
@@ -279,11 +300,14 @@
   </section>
 
   <section id="screen-play" hidden>
-    <div class="peek"></div>
+    <div class="pics" aria-hidden="true"><div class="pic"></div><div class="pic"></div></div>
     <div class="panel">
       <p class="tag" id="ticket-tag"></p>
       <p id="story"></p>
       <h2 id="question"></h2>
+    </div>
+    <div class="pics" aria-hidden="true"><div class="pic"></div><div class="pic"></div></div>
+    <div class="panel">
       <div class="answers" id="answers"></div>
       <div class="feedback" id="feedback" hidden>
         <p class="verdict" id="verdict"></p>
@@ -291,6 +315,7 @@
         <button class="go" id="next" type="button">Next Call</button>
       </div>
     </div>
+    <div class="pics" aria-hidden="true"><div class="pic"></div><div class="pic"></div></div>
   </section>
 
   <section id="screen-end" hidden>
@@ -319,20 +344,8 @@ const cLengths_arr = [
 ];
 
 const cInk_str = '#2B2A33';
-const cBeige_str = '#E9DFC8';
-const cBeigeDark_str = '#CFC3A6';
-
-// >>>>> fnMonitor_str <<<<<
-// Draws a boxy old monitor that stands on the desk line. The caller passes
-// the bezel color, the screen color, and whatever is drawn on the screen.
-function fnMonitor_str(pBezel_str, pScreen_str, pInner_str) {
-  return '<rect x="170" y="250" width="60" height="22" fill="' + cBeigeDark_str + '"/>' +
-    '<rect x="140" y="270" width="120" height="20" rx="6" fill="' + pBezel_str + '"/>' +
-    '<rect x="80" y="70" width="240" height="180" rx="14" fill="' + pBezel_str + '"/>' +
-    '<rect x="100" y="88" width="200" height="130" rx="6" fill="' + pScreen_str + '"/>' +
-    pInner_str +
-    '<circle cx="290" cy="234" r="5" fill="#7BC67B"/>';
-}
+const cSkin_str = '#F3C9A0';
+const cPaperWhite_str = '#FFFDF6';
 
 // >>>>> fnStar_str <<<<<
 // Draws a five-pointed star around a center point.
@@ -351,32 +364,34 @@ function fnStar_str(pX_int, pY_int, pRadius_int, pFill_str) {
   return '<polygon points="' + vPoints_arr.join(' ') + '" fill="' + pFill_str + '"/>';
 }
 
-// >>>>> fnKeys_str <<<<<
-// Draws one row of keyboard keys. The key at pGap_int is left out and
-// drawn as an empty outline with a question mark, for the missing "Any" key.
-function fnKeys_str(pY_int, pGap_int) {
-  const cKeyCount_int = 7;
-  const cFirstX_int = 76;
-  const cStep_int = 36;
-  const cSize_int = 28;
-  var vKeys_str = '';
-  var vIndex_int;
-  var vX_int;
-  for (vIndex_int = 0; vIndex_int < cKeyCount_int; vIndex_int++) {
-    vX_int = cFirstX_int + vIndex_int * cStep_int;
-    if (vIndex_int === pGap_int) {
-      vKeys_str += '<rect x="' + vX_int + '" y="' + pY_int + '" width="' + cSize_int + '" height="' + cSize_int + '" rx="5" fill="#F2B632"/>' +
-        '<text x="' + (vX_int + cSize_int / 2) + '" y="' + (pY_int + 22) + '" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="22" fill="' + cInk_str + '" stroke="none">?</text>';
-    } else {
-      vKeys_str += '<rect x="' + vX_int + '" y="' + pY_int + '" width="' + cSize_int + '" height="' + cSize_int + '" rx="5" fill="#FFFDF6"/>';
-    }
-  }
-  return vKeys_str;
+function fnText_str(pX_int, pY_int, pSize_int, pText_str, pFill_str) {
+  return '<text x="' + pX_int + '" y="' + pY_int + '" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="' + pSize_int +
+    '" fill="' + pFill_str + '" stroke="none">' + pText_str + '</text>';
 }
 
-// Each picture is drawn on a 400 by 700 canvas. The wall color fills the
-// screen above the desk line at y = 290 and the desk color fills it below,
-// so the subject of every picture stays between y = 60 and y = 290.
+function fnBubble_str() {
+  return '<polygon points="60,58 46,86 86,64" fill="#FFFFFF"/><ellipse cx="84" cy="38" rx="60" ry="30" fill="#FFFFFF"/>' +
+    '<line x1="62" y1="62" x2="82" y2="66" stroke="#FFFFFF" stroke-width="6"/>';
+}
+
+function fnCrayon_str(pFill_str) {
+  return '<rect x="70" y="14" width="20" height="70" fill="' + pFill_str + '"/><rect x="70" y="34" width="20" height="26" fill="' + cPaperWhite_str + '" stroke-width="2"/>' +
+    '<polygon points="70,84 90,84 80,104" fill="' + pFill_str + '"/>';
+}
+
+function fnPencil_str() {
+  return '<rect x="24" y="50" width="90" height="20" fill="#F2B632"/><polygon points="114,50 140,60 114,70" fill="#F3EBD3"/><rect x="24" y="50" width="14" height="20" fill="#F29E8E"/>';
+}
+
+// The start and end screens show one full picture, the ringing phone, drawn
+// on a 400 by 700 canvas. The wall color fills the screen above the desk
+// line at y = 290 and the desk color fills it below.
+//
+// Every call has four small pictures instead: one for its right ending
+// (right_str) and one for each wrong ending (wrong_arr, in the same order as
+// the call's wrong endings). Each is one plain object that only nods at its
+// ending, so no picture gives the answer away. A small picture is drawn in a
+// box 160 wide and 108 tall, and the page scatters the four around the call.
 const cScenes_obj = {
   lobby: {
     wall_str: '#2F8F9D',
@@ -392,407 +407,203 @@ const cScenes_obj = {
   },
   floppy: {
     wall_str: '#5B8E7D',
-    desk_str: '#8C6A4F',
-    art_str: '<rect x="70" y="80" width="180" height="210" rx="10" fill="' + cBeige_str + '"/>' +
-      '<rect x="90" y="108" width="140" height="40" rx="4" fill="' + cBeigeDark_str + '"/>' +
-      '<rect x="100" y="124" width="120" height="9" fill="' + cInk_str + '"/>' +
-      '<rect x="112" y="92" width="74" height="40" rx="3" fill="#3D6FB6" transform="rotate(-9 149 112)"/>' +
-      '<rect x="138" y="96" width="74" height="40" rx="3" fill="#D9534F" transform="rotate(8 175 116)"/>' +
-      '<circle cx="102" cy="176" r="7" fill="#7BC67B"/>' +
-      '<rect x="90" y="206" width="140" height="10" rx="3" fill="' + cBeigeDark_str + '"/>' +
-      '<rect x="90" y="228" width="140" height="10" rx="3" fill="' + cBeigeDark_str + '"/>' +
-      '<rect x="90" y="250" width="140" height="10" rx="3" fill="' + cBeigeDark_str + '"/>' +
-      '<g transform="rotate(14 304 160)"><rect x="268" y="122" width="74" height="76" rx="4" fill="#F2B632"/>' +
-      '<rect x="284" y="122" width="40" height="24" fill="#DADADA"/><rect x="280" y="158" width="50" height="40" fill="#FFF8E7"/></g>' +
-      '<path d="M262 96 q14 -18 30 -10" fill="none"/><path d="M270 228 q20 12 40 0" fill="none"/>'
+    // An overstuffed suitcase, for the disk that will not fit.
+    right_str: '<rect x="62" y="12" width="36" height="22" rx="8" fill="none"/><path d="M30 60 q-20 -4 -16 14 q8 8 16 -2" fill="#D9534F"/><path d="M130 60 q22 -6 18 16 q-10 6 -18 -4" fill="#3D6FB6"/>' +
+      '<rect x="24" y="30" width="112" height="78" rx="12" fill="#B5651D"/><line x1="24" y1="62" x2="136" y2="62"/><rect x="72" y="54" width="16" height="16" rx="3" fill="#F2B632"/>',
+    wrong_arr: [
+      '<polygon points="36,50 18,34 44,30 60,46" fill="#B9884A"/><polygon points="124,50 142,34 116,30 100,46" fill="#B9884A"/>' +
+        '<rect x="36" y="50" width="88" height="58" fill="#C99A5B"/><rect x="64" y="70" width="32" height="14" fill="#E9D8A6"/>',
+      '<circle cx="48" cy="66" r="16" fill="#8CCB7E"/><circle cx="80" cy="72" r="16" fill="#8CCB7E"/><circle cx="112" cy="66" r="16" fill="#8CCB7E"/>' +
+        '<path d="M10 60 q70 86 140 0 q-70 40 -140 0 z" fill="#4E9F6B"/>',
+      '<rect x="48" y="14" width="26" height="40" rx="6" fill="#E9C27A"/><rect x="86" y="4" width="26" height="50" rx="6" fill="#E9C27A"/>' +
+        '<rect x="26" y="44" width="110" height="60" rx="14" fill="#C9CDD4"/><rect x="134" y="60" width="12" height="10" fill="' + cInk_str + '"/>' +
+        '<rect x="36" y="104" width="14" height="4" fill="' + cInk_str + '"/><rect x="112" y="104" width="14" height="4" fill="' + cInk_str + '"/>'
+    ]
   },
   cup: {
     wall_str: '#E8B04A',
-    desk_str: '#7A5C46',
-    art_str: '<rect x="60" y="80" width="170" height="210" rx="10" fill="' + cBeige_str + '"/>' +
-      '<rect x="80" y="104" width="130" height="30" rx="4" fill="' + cBeigeDark_str + '"/>' +
-      '<rect x="80" y="160" width="130" height="16" fill="' + cInk_str + '"/>' +
-      '<rect x="150" y="162" width="180" height="13" rx="3" fill="#BDB29A"/>' +
-      '<circle cx="92" cy="206" r="7" fill="#7BC67B"/>' +
-      '<rect x="80" y="236" width="130" height="10" rx="3" fill="' + cBeigeDark_str + '"/>' +
-      '<rect x="80" y="258" width="130" height="10" rx="3" fill="' + cBeigeDark_str + '"/>' +
-      '<path d="M306 122 h18 a14 14 0 0 1 0 28 h-18" fill="none"/>' +
-      '<rect x="254" y="108" width="54" height="54" rx="7" fill="#E4572E"/>' +
-      '<path d="M268 96 q-8 -12 0 -22 q8 -10 0 -20" fill="none"/><path d="M290 96 q-8 -12 0 -22 q8 -10 0 -20" fill="none"/>'
+    right_str: '<path d="M104 52 h16 a16 16 0 0 1 0 32 h-16" fill="none"/><rect x="48" y="40" width="58" height="68" rx="8" fill="#E4572E"/>' +
+      '<path d="M64 30 q-8 -12 0 -22" fill="none"/><path d="M88 30 q-8 -12 0 -22" fill="none"/>',
+    wrong_arr: [
+      '<g transform="rotate(-30 80 60)">' + fnPencil_str() + '</g><path d="M96 98 q8 -10 14 0 q6 10 14 0" fill="none"/>',
+      '<rect x="20" y="8" width="120" height="14" rx="5" fill="#7A5C46"/><circle cx="80" cy="24" r="7" fill="' + cInk_str + '"/>' +
+        '<path d="M80 28 L52 44 L44 104 H116 L108 44 Z" fill="#3D5A80"/><line x1="80" y1="44" x2="80" y2="104"/>',
+      '<polygon points="40,108 80,22 120,108" fill="#FFFFFF"/><polygon points="40,108 80,66 120,108" fill="#F3EBD3"/>'
+    ]
   },
   anykey: {
     wall_str: '#7A6FB0',
-    desk_str: '#4B437A',
-    art_str: '<rect x="56" y="150" width="288" height="140" rx="12" fill="' + cBeige_str + '"/>' +
-      fnKeys_str(166, -1) + fnKeys_str(202, 4) + fnKeys_str(238, -1) +
-      '<path d="M236 148 q10 -40 50 -52" fill="none"/>' +
-      '<circle cx="306" cy="86" r="26" fill="#FFFDF6"/>' +
-      '<text x="306" y="98" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="34" fill="' + cInk_str + '" stroke="none">?</text>'
+    // A magnifying glass, for the key nobody can find.
+    right_str: '<line x1="96" y1="72" x2="132" y2="104" stroke-width="12"/><circle cx="70" cy="48" r="34" fill="#CDEBFA"/><path d="M52 38 q8 -12 22 -12" fill="none" stroke="#FFFFFF"/>',
+    wrong_arr: [
+      '<rect x="22" y="54" width="50" height="46" rx="18" fill="' + cSkin_str + '"/><rect x="88" y="54" width="50" height="46" rx="18" fill="' + cSkin_str + '"/>' +
+        '<line x1="40" y1="40" x2="34" y2="24"/><line x1="80" y1="40" x2="80" y2="22"/><line x1="120" y1="40" x2="126" y2="24"/>',
+      '<path d="M56 54 v-18 a24 24 0 0 1 48 0 v18" fill="none" stroke-width="8"/><rect x="40" y="52" width="80" height="56" rx="8" fill="#F2B632"/>' +
+        '<circle cx="80" cy="74" r="8" fill="' + cInk_str + '"/><rect x="77" y="76" width="6" height="18" fill="' + cInk_str + '" stroke="none"/>',
+      '<g transform="translate(0 14)"><path d="M80 14 a30 30 0 0 1 16 55 v9 h-32 v-9 a30 30 0 0 1 16 -55 z" fill="#F2D25C"/><rect x="66" y="78" width="28" height="16" rx="3" fill="#9AA3AD"/>' +
+        '<line x1="34" y1="44" x2="18" y2="44"/><line x1="126" y1="44" x2="142" y2="44"/><line x1="46" y1="14" x2="36" y2="2"/><line x1="114" y1="14" x2="124" y2="2"/></g>'
+    ]
   },
   pedal: {
     wall_str: '#C9D6DF',
-    desk_str: '#A47551',
-    art_str: '<rect x="56" y="88" width="288" height="20" rx="4" fill="#7A5C46"/>' +
-      '<rect x="70" y="108" width="14" height="182" fill="#7A5C46"/>' +
-      '<rect x="318" y="108" width="14" height="182" fill="#7A5C46"/>' +
-      '<path d="M226 276 C 170 272 150 200 150 108" fill="none"/>' +
-      '<rect x="268" y="108" width="40" height="124" fill="#3D5A80"/>' +
-      '<ellipse cx="258" cy="276" rx="38" ry="14" fill="' + cBeige_str + '"/>' +
-      '<path d="M232 264 q0 -26 34 -28 l10 -6 h36 v34 z" fill="#4A2F23"/>'
+    // A sewing machine, which is worked with a foot pedal.
+    right_str: '<rect x="20" y="92" width="120" height="16" rx="4" fill="#6C7A89"/><path d="M34 92 v-52 a10 10 0 0 1 10 -10 h84 v30 h-14 v-8 h-48 v40 z" fill="#3D5A80"/>' +
+      '<line x1="121" y1="60" x2="121" y2="88"/><circle cx="50" cy="22" r="9" fill="#D9534F"/>',
+    wrong_arr: [
+      '<rect x="70" y="88" width="72" height="16" fill="#F2D25C"/><circle cx="70" cy="62" r="42" fill="#F2D25C"/><circle cx="70" cy="62" r="20" fill="' + cPaperWhite_str + '"/>',
+      '<rect x="36" y="46" width="88" height="62" fill="#C99A5B"/><line x1="36" y1="62" x2="124" y2="62"/><rect x="72" y="46" width="16" height="30" fill="#E9D8A6"/>',
+      '<rect x="30" y="16" width="100" height="88" rx="8" fill="#6C7A89"/><rect x="42" y="28" width="76" height="64" rx="4" fill="#9AA3AD"/>' +
+        '<circle cx="80" cy="60" r="16" fill="#EEEEEE"/><line x1="80" y1="60" x2="90" y2="50"/><rect x="38" y="104" width="14" height="4" fill="' + cInk_str + '"/>' +
+        '<rect x="108" y="104" width="14" height="4" fill="' + cInk_str + '"/>'
+    ]
   },
   dark: {
     wall_str: '#1B2140',
-    desk_str: '#121630',
-    art_str: '<rect x="240" y="70" width="92" height="104" fill="#2C3A6B"/>' +
-      '<line x1="286" y1="70" x2="286" y2="174"/><line x1="240" y1="122" x2="332" y2="122"/>' +
-      '<circle cx="306" cy="98" r="15" fill="#F5E9A8"/>' +
-      '<g transform="translate(-30 72.5) scale(0.75)">' + fnMonitor_str('#3A3F5C', '#0D0F1A', '') + '</g>' +
-      '<circle cx="277" cy="226" r="46" fill="#F6A623" opacity="0.14" stroke="none"/>' +
-      '<rect x="269" y="244" width="16" height="46" fill="#F3EBD3"/>' +
-      '<path d="M277 242 q-12 -14 0 -30 q12 16 0 30 z" fill="#F6A623"/>'
+    right_str: '<circle cx="80" cy="38" r="36" fill="#F6A623" opacity="0.18" stroke="none"/><path d="M80 52 q-16 -20 0 -42 q16 22 0 42 z" fill="#F6A623"/>' +
+      '<rect x="66" y="52" width="28" height="48" fill="#F3EBD3"/><ellipse cx="80" cy="102" rx="34" ry="6" fill="#9AA3AD"/>',
+    wrong_arr: [
+      '<g transform="rotate(-35 80 58)"><rect x="68" y="40" width="24" height="64" rx="6" fill="#9AA3AD"/><path d="M56 40 v-22 l14 8 h20 l14 -8 v22 a24 16 0 0 1 -48 0 z" fill="#9AA3AD"/></g>',
+      '<path d="M30 96 q-22 -6 -14 -26" fill="none" stroke="#E8A04C" stroke-width="8"/><ellipse cx="74" cy="88" rx="48" ry="20" fill="#E8A04C"/><circle cx="118" cy="76" r="18" fill="#E8A04C"/>' +
+        '<polygon points="104,66 106,48 118,60" fill="#E8A04C"/><polygon points="122,60 134,48 134,68" fill="#E8A04C"/>' +
+        '<path d="M108 78 q4 4 8 0" fill="none" stroke-width="3"/><path d="M122 78 q4 4 8 0" fill="none" stroke-width="3"/>' + fnText_str(64, 52, 24, 'z z', '#F5E9A8'),
+      '<rect x="24" y="50" width="34" height="58" fill="#3A3F5C"/><rect x="62" y="22" width="38" height="86" fill="#4A5078"/><rect x="104" y="58" width="34" height="50" fill="#3A3F5C"/>' +
+        '<g fill="#F5E9A8" stroke="none"><rect x="32" y="60" width="7" height="8"/><rect x="44" y="76" width="7" height="8"/><rect x="70" y="34" width="8" height="9"/><rect x="84" y="34" width="8" height="9"/>' +
+        '<rect x="70" y="56" width="8" height="9"/><rect x="84" y="78" width="8" height="9"/><rect x="112" y="68" width="7" height="8"/><rect x="124" y="84" width="7" height="8"/></g>'
+    ]
   },
   photocopy: {
     wall_str: '#F29E8E',
-    desk_str: '#6C7A89',
-    art_str: '<polygon points="268,236 340,226 340,238 268,252" fill="#9AA3AD"/>' +
-      '<rect x="64" y="180" width="206" height="110" rx="8" fill="#D8D3C4"/>' +
-      '<polygon points="74,180 260,180 256,150 78,158" fill="#6C7A89"/>' +
-      '<rect x="84" y="180" width="166" height="6" fill="#7BE08A" stroke="none"/>' +
-      '<rect x="190" y="204" width="62" height="22" fill="' + cInk_str + '"/>' +
-      '<circle cx="92" cy="216" r="8" fill="#7BC67B"/><circle cx="118" cy="216" r="8" fill="#D9534F"/>' +
-      '<rect x="84" y="250" width="166" height="10" rx="3" fill="#BDB8A8"/>' +
-      '<g transform="rotate(-8 300 150)"><rect x="262" y="96" width="78" height="100" fill="#FFFFFF"/>' +
-      '<rect x="278" y="118" width="46" height="48" rx="3" fill="#BDBDBD"/><rect x="288" y="118" width="24" height="15" fill="#8E8E8E"/>' +
-      '<rect x="285" y="143" width="32" height="23" fill="#E6E6E6"/></g>'
+    // Two matching sheets of paper.
+    right_str: '<g transform="rotate(8 91 58)"><rect x="56" y="14" width="70" height="88" fill="#E2E2E2"/></g><g transform="rotate(-6 71 62)"><rect x="36" y="18" width="70" height="88" fill="#FFFFFF"/>' +
+      '<g stroke-width="3"><line x1="46" y1="36" x2="96" y2="36"/><line x1="46" y1="52" x2="96" y2="52"/><line x1="46" y1="68" x2="96" y2="68"/><line x1="46" y1="84" x2="78" y2="84"/></g></g>',
+    wrong_arr: [
+      '<g transform="rotate(-24 80 60)">' + fnCrayon_str('#D9534F') + '</g><g transform="rotate(22 80 60)">' + fnCrayon_str('#3D6FB6') + '</g>',
+      '<rect x="20" y="12" width="120" height="9" rx="4" fill="#9AA3AD"/><rect x="44" y="14" width="72" height="88" fill="#5BC0DE"/>' +
+        '<line x1="46" y1="80" x2="114" y2="80" stroke="#FFFFFF"/><line x1="46" y1="90" x2="114" y2="90" stroke="#FFFFFF"/>',
+      '<rect x="60" y="20" width="30" height="16" fill="#6C7A89"/><rect x="24" y="34" width="112" height="70" rx="10" fill="#3D5A80"/><circle cx="80" cy="70" r="24" fill="#CDEBFA"/>' +
+        '<circle cx="80" cy="70" r="10" fill="' + cInk_str + '"/><circle cx="120" cy="48" r="5" fill="#F2D25C"/>'
+    ]
   },
   windows: {
     wall_str: '#F3E3C3',
-    desk_str: '#B5835A',
-    art_str: '<rect x="70" y="80" width="110" height="160" fill="#9AD4F5"/>' +
-      '<ellipse cx="112" cy="126" rx="24" ry="12" fill="#FFFFFF" stroke="none"/><ellipse cx="134" cy="118" rx="20" ry="12" fill="#FFFFFF" stroke="none"/>' +
-      '<polygon points="70,80 52,92 52,252 70,240" fill="#CDEBFA"/><polygon points="180,80 198,92 198,252 180,240" fill="#CDEBFA"/>' +
-      '<rect x="220" y="80" width="110" height="160" fill="#9AD4F5"/>' +
-      '<circle cx="296" cy="118" r="18" fill="#F2D25C"/>' +
-      '<polygon points="220,80 202,92 202,252 220,240" fill="#CDEBFA"/><polygon points="330,80 348,92 348,252 330,240" fill="#CDEBFA"/>' +
-      '<path d="M222 82 q44 58 -4 150 q34 -8 50 -40 q-8 -62 -46 -110 z" fill="#E4572E"/>' +
-      '<path d="M72 82 q44 58 -4 150 q34 -8 50 -40 q-8 -62 -46 -110 z" fill="#E4572E"/>' +
-      '<rect x="60" y="240" width="130" height="12" fill="#B5835A"/><rect x="210" y="240" width="130" height="12" fill="#B5835A"/>'
+    right_str: '<rect x="44" y="8" width="72" height="100" fill="#B5651D"/><rect x="54" y="18" width="52" height="34" fill="#C98B4B"/><rect x="54" y="62" width="52" height="38" fill="#C98B4B"/>' +
+      '<circle cx="106" cy="57" r="5" fill="#F2D25C"/>',
+    wrong_arr: [
+      '<rect x="20" y="28" width="120" height="80" fill="#C0553F"/><g stroke-width="3"><line x1="20" y1="48" x2="140" y2="48"/><line x1="20" y1="68" x2="140" y2="68"/><line x1="20" y1="88" x2="140" y2="88"/>' +
+        '<line x1="60" y1="28" x2="60" y2="48"/><line x1="100" y1="28" x2="100" y2="48"/><line x1="40" y1="48" x2="40" y2="68"/><line x1="80" y1="48" x2="80" y2="68"/><line x1="120" y1="48" x2="120" y2="68"/>' +
+        '<line x1="60" y1="68" x2="60" y2="88"/><line x1="100" y1="68" x2="100" y2="88"/><line x1="40" y1="88" x2="40" y2="108"/><line x1="80" y1="88" x2="80" y2="108"/><line x1="120" y1="88" x2="120" y2="108"/></g>',
+      '<line x1="34" y1="50" x2="56" y2="50"/><line x1="34" y1="70" x2="56" y2="70"/><rect x="56" y="38" width="40" height="44" rx="8" fill="#9AA3AD"/><path d="M96 60 q40 0 34 48" fill="none"/>',
+      '<circle cx="80" cy="62" r="42" fill="' + cSkin_str + '"/><path d="M40 48 a42 42 0 0 1 80 0 q-40 -22 -80 0 z" fill="#4A2F23"/>' +
+        '<path d="M56 62 q8 8 16 0" fill="none"/><path d="M88 62 q8 8 16 0" fill="none"/><path d="M68 82 q12 8 24 0" fill="none"/>'
+    ]
   },
   whiteout: {
     wall_str: '#8FB8DE',
-    desk_str: '#7A5C46',
-    art_str: '<g transform="translate(-30 0)">' + fnMonitor_str(cBeige_str, '#1F4E79',
-      '<g stroke="none" fill="#CDE3F7"><rect x="114" y="104" width="150" height="9"/><rect x="114" y="124" width="170" height="9"/>' +
-      '<rect x="114" y="144" width="120" height="9"/><rect x="114" y="164" width="160" height="9"/><rect x="114" y="184" width="140" height="9"/></g>' +
-      '<g stroke="none" fill="#FFFFFF"><ellipse cx="170" cy="108" rx="20" ry="10"/><ellipse cx="246" cy="129" rx="24" ry="11"/>' +
-      '<ellipse cx="140" cy="168" rx="18" ry="10"/><ellipse cx="226" cy="188" rx="22" ry="10"/></g>') + '</g>' +
-      '<rect x="302" y="238" width="32" height="52" rx="5" fill="#FFFFFF"/>' +
-      '<rect x="302" y="256" width="32" height="14" fill="#5BC0DE" stroke="none"/>' +
-      '<rect x="309" y="220" width="18" height="18" rx="3" fill="#D9534F"/>'
+    right_str: '<rect x="50" y="48" width="48" height="60" rx="6" fill="#FFFFFF"/><rect x="50" y="68" width="48" height="18" fill="#5BC0DE" stroke="none"/><rect x="60" y="26" width="28" height="22" rx="3" fill="#D9534F"/>' +
+      '<path d="M108 98 q10 -16 24 -2 q8 12 -10 12 q-16 0 -14 -10 z" fill="#FFFFFF"/>',
+    wrong_arr: [
+      '<rect x="26" y="52" width="44" height="46" fill="#F2D25C" transform="rotate(-8 48 75)"/><rect x="60" y="34" width="44" height="46" fill="#F29E8E"/>' +
+        '<rect x="90" y="56" width="44" height="46" fill="#B7D7A8" transform="rotate(8 112 79)"/>',
+      '<g transform="rotate(12 76 58)"><rect x="46" y="28" width="60" height="60" rx="6" fill="#E9C27A"/><g fill="' + cInk_str + '" stroke="none"><circle cx="62" cy="44" r="3"/>' +
+        '<circle cx="90" cy="44" r="3"/><circle cx="76" cy="58" r="3"/><circle cx="62" cy="72" r="3"/><circle cx="90" cy="72" r="3"/></g></g>' +
+        '<g fill="#E9C27A" stroke-width="2"><circle cx="128" cy="98" r="5"/><circle cx="140" cy="84" r="3"/><circle cx="26" cy="100" r="4"/><circle cx="114" cy="104" r="3"/></g>',
+      '<rect x="34" y="20" width="92" height="88" rx="5" fill="#AEB8C2"/><rect x="44" y="28" width="72" height="20" fill="#C3CCD4"/><rect x="70" y="35" width="20" height="6" rx="3" fill="#6C7A89"/>' +
+        '<rect x="44" y="54" width="72" height="20" fill="#6C7A89"/><rect x="24" y="74" width="112" height="30" rx="4" fill="#C3CCD4"/><rect x="68" y="85" width="24" height="7" rx="3" fill="#6C7A89"/>'
+    ]
   },
   fax: {
     wall_str: '#B7D7A8',
-    desk_str: '#5E548E',
-    art_str: '<rect x="184" y="84" width="92" height="124" fill="#FFFFFF"/>' +
-      '<g stroke-width="3"><line x1="198" y1="106" x2="262" y2="106"/><line x1="198" y1="124" x2="262" y2="124"/><line x1="198" y1="142" x2="246" y2="142"/></g>' +
-      '<rect x="90" y="196" width="230" height="94" rx="12" fill="#C9CDD4"/>' +
-      '<rect x="172" y="196" width="116" height="12" fill="' + cInk_str + '"/>' +
-      '<rect x="98" y="176" width="46" height="110" rx="16" fill="#8B93A1"/>' +
-      '<g fill="#FFFDF6"><circle cx="176" cy="232" r="7"/><circle cx="200" cy="232" r="7"/><circle cx="224" cy="232" r="7"/>' +
-      '<circle cx="176" cy="254" r="7"/><circle cx="200" cy="254" r="7"/><circle cx="224" cy="254" r="7"/></g>' +
-      '<circle cx="286" cy="240" r="12" fill="#7BC67B"/>' +
-      '<path d="M296 150 q30 6 30 36" fill="none"/><polygon points="316,180 336,180 326,196" fill="' + cInk_str + '"/>'
+    // A boomerang, for the page that keeps coming back.
+    right_str: '<path d="M22 98 L72 22 L138 82 L118 96 L76 56 L46 106 Z" fill="#C98B4B"/><path d="M104 20 q30 4 36 32" fill="none"/><polygon points="130,50 150,48 142,66" fill="' + cInk_str + '"/>',
+    wrong_arr: [
+      '<rect x="24" y="84" width="112" height="24" rx="6" fill="#9AA3AD"/><rect x="72" y="72" width="16" height="14" fill="#6C7A89"/><circle cx="80" cy="44" r="30" fill="#FFFFFF"/>' +
+        '<line x1="80" y1="44" x2="96" y2="26"/><circle cx="80" cy="44" r="4" fill="' + cInk_str + '"/>',
+      '<g transform="rotate(-6 80 60)"><rect x="40" y="14" width="80" height="94" fill="#FFFFFF"/><rect x="50" y="24" width="60" height="74" fill="#D9534F"/>' +
+        '<polygon points="56,88 76,54 88,72 96,62 106,88" fill="#FFFFFF" stroke-width="2"/><circle cx="96" cy="40" r="7" fill="#F2D25C" stroke-width="2"/></g>',
+      '<rect x="70" y="8" width="20" height="74" rx="10" fill="#FFFFFF"/><circle cx="80" cy="88" r="18" fill="#D9534F"/><rect x="76" y="46" width="8" height="34" fill="#D9534F" stroke="none"/>' +
+        '<line x1="98" y1="24" x2="110" y2="24"/><line x1="98" y1="40" x2="110" y2="40"/><line x1="98" y1="56" x2="110" y2="56"/>'
+    ]
   },
   mousescreen: {
     wall_str: '#F2D25C',
-    desk_str: '#4F6D7A',
-    art_str: fnMonitor_str(cBeige_str, '#2F8F9D',
-      '<rect x="150" y="160" width="100" height="36" rx="6" fill="' + cBeige_str + '"/>' +
-      '<text x="200" y="187" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="24" fill="' + cInk_str + '" stroke="none">OK</text>') +
-      '<path d="M236 176 C 262 236 316 232 330 290" fill="none"/>' +
-      '<g transform="rotate(-22 214 138)"><rect x="188" y="98" width="54" height="82" rx="26" fill="#FFFFFF"/>' +
-      '<line x1="215" y1="98" x2="215" y2="130"/><line x1="188" y1="130" x2="242" y2="130"/></g>'
+    // A hand pressed flat against a pane of glass.
+    right_str: '<rect x="22" y="8" width="116" height="100" fill="#CDEBFA"/><line x1="34" y1="36" x2="54" y2="16" stroke="#FFFFFF"/><line x1="34" y1="56" x2="70" y2="18" stroke="#FFFFFF"/>' +
+      '<g fill="' + cSkin_str + '"><rect x="60" y="34" width="11" height="34" rx="5"/><rect x="72" y="26" width="11" height="40" rx="5"/><rect x="84" y="28" width="11" height="40" rx="5"/>' +
+      '<rect x="96" y="36" width="11" height="34" rx="5"/><rect x="42" y="62" width="30" height="12" rx="6" transform="rotate(30 57 68)"/><rect x="58" y="56" width="50" height="42" rx="14"/></g>',
+    wrong_arr: [
+      '<g transform="rotate(35 80 60)"><rect x="70" y="14" width="20" height="74" rx="4" fill="#3D6FB6"/><rect x="74" y="2" width="12" height="12" fill="#9AA3AD"/>' +
+        '<polygon points="70,88 90,88 80,106" fill="#9AA3AD"/><line x1="94" y1="20" x2="94" y2="48"/></g>',
+      '<rect x="50" y="70" width="14" height="30" fill="#6C7A89"/><polygon points="30,48 100,20 100,96 30,68" fill="#E4572E"/><rect x="18" y="46" width="14" height="24" rx="3" fill="#F3EBD3"/>' +
+        '<rect x="100" y="16" width="10" height="84" rx="4" fill="#B63D1C"/><path d="M122 40 q10 18 0 36" fill="none"/><path d="M136 30 q16 28 0 56" fill="none"/>',
+      '<g transform="rotate(-20 80 60)"><rect x="12" y="54" width="30" height="12" rx="5" fill="#B5651D"/><rect x="118" y="54" width="30" height="12" rx="5" fill="#B5651D"/>' +
+        '<rect x="38" y="42" width="84" height="36" rx="12" fill="#E9C27A"/></g>'
+    ]
   },
   mycomputer: {
     wall_str: '#E58F65',
-    desk_str: '#3D5A80',
-    art_str: fnMonitor_str(cBeige_str, '#2F8F9D',
-      '<rect x="150" y="100" width="100" height="84" rx="4" fill="none" stroke="#FFFFFF" stroke-dasharray="8 6"/>' +
-      '<rect x="170" y="110" width="60" height="44" rx="4" fill="' + cBeige_str + '"/><rect x="178" y="117" width="44" height="28" fill="#9AD4F5"/>' +
-      '<rect x="162" y="160" width="76" height="13" rx="3" fill="' + cBeige_str + '"/>' +
-      '<polygon points="250,168 250,202 259,194 266,209 273,205 266,191 278,190" fill="#FFFFFF"/>')
+    // Binoculars, for a computer that is a long way off.
+    right_str: '<rect x="66" y="50" width="28" height="18" fill="#6C7A89"/><rect x="30" y="30" width="42" height="74" rx="10" fill="#3D5A80"/><rect x="88" y="30" width="42" height="74" rx="10" fill="#3D5A80"/>' +
+      '<rect x="30" y="16" width="42" height="20" rx="5" fill="#CDEBFA"/><rect x="88" y="16" width="42" height="20" rx="5" fill="#CDEBFA"/>',
+    wrong_arr: [
+      '<rect x="62" y="24" width="18" height="46" rx="9" fill="' + cSkin_str + '"/><rect x="50" y="56" width="60" height="48" rx="14" fill="' + cSkin_str + '"/>' +
+        '<line x1="80" y1="62" x2="80" y2="78"/><line x1="94" y1="62" x2="94" y2="78"/>',
+      '<g transform="rotate(-10 46 70)"><rect x="18" y="42" width="56" height="56" rx="10" fill="' + cPaperWhite_str + '"/><circle cx="46" cy="70" r="6" fill="' + cInk_str + '" stroke="none"/></g>' +
+        '<g transform="rotate(12 112 64)"><rect x="84" y="36" width="56" height="56" rx="10" fill="' + cPaperWhite_str + '"/><circle cx="100" cy="52" r="6" fill="' + cInk_str + '" stroke="none"/>' +
+        '<circle cx="124" cy="76" r="6" fill="' + cInk_str + '" stroke="none"/></g>',
+      '<path d="M30 92 q-24 4 -18 -24" fill="none"/><ellipse cx="78" cy="84" rx="50" ry="24" fill="#9AA3AD"/><circle cx="98" cy="56" r="14" fill="#C9CDD4"/>' +
+        '<circle cx="110" cy="78" r="3.5" fill="' + cInk_str + '" stroke="none"/><circle cx="128" cy="86" r="5" fill="#E88FB0"/>'
+    ]
   },
   stars: {
     wall_str: '#1F2A5C',
-    desk_str: '#121A3F',
-    art_str: '<g stroke="none">' + fnStar_str(76, 84, 12, '#F5E9A8') + fnStar_str(150, 66, 8, '#F5E9A8') + fnStar_str(238, 92, 10, '#F5E9A8') +
-      fnStar_str(326, 72, 13, '#F5E9A8') + fnStar_str(52, 200, 8, '#F5E9A8') + fnStar_str(352, 216, 9, '#F5E9A8') + '</g>' +
-      '<rect x="70" y="126" width="260" height="134" rx="10" fill="#F1EDE2"/>' +
-      '<path d="M70 156 v-20 a10 10 0 0 1 10 -10 h240 a10 10 0 0 1 10 10 v20 z" fill="#5B6BBF"/>' +
-      '<rect x="92" y="184" width="216" height="52" rx="6" fill="#FFFFFF"/>' +
-      '<g stroke="none">' + fnStar_str(120, 211, 14, cInk_str) + fnStar_str(160, 211, 14, cInk_str) + fnStar_str(200, 211, 14, cInk_str) +
-      fnStar_str(240, 211, 14, cInk_str) + fnStar_str(280, 211, 14, cInk_str) + '</g>'
+    // A magic wand.
+    right_str: '<line x1="28" y1="102" x2="90" y2="42" stroke="#F3EBD3" stroke-width="9"/>' + fnStar_str(104, 30, 26, '#F5E9A8') + fnStar_str(138, 70, 9, '#F5E9A8') + fnStar_str(56, 22, 9, '#F5E9A8'),
+    wrong_arr: [
+      '<rect x="66" y="52" width="76" height="12" fill="#F2B632"/><rect x="112" y="64" width="10" height="18" fill="#F2B632"/><rect x="132" y="64" width="10" height="14" fill="#F2B632"/>' +
+        '<circle cx="46" cy="58" r="28" fill="#F2B632"/><circle cx="46" cy="58" r="10" fill="' + cInk_str + '"/>',
+      '<rect x="72" y="72" width="16" height="36" rx="6" fill="#B5651D"/><ellipse cx="80" cy="42" rx="34" ry="36" fill="#E88FB0"/><ellipse cx="80" cy="42" rx="24" ry="26" fill="#CDEBFA"/>' +
+        '<line x1="68" y1="36" x2="82" y2="22" stroke="#FFFFFF"/>',
+      '<circle cx="80" cy="60" r="44" fill="#F2D25C"/><circle cx="64" cy="48" r="6" fill="' + cInk_str + '" stroke="none"/><circle cx="96" cy="48" r="6" fill="' + cInk_str + '" stroke="none"/>' +
+        '<path d="M58 68 q22 24 44 0" fill="none"/>'
+    ]
   },
   magnet: {
     wall_str: '#F4C7C3',
-    desk_str: '#8C6A4F',
-    art_str: '<rect x="100" y="60" width="200" height="230" rx="8" fill="#AEB8C2"/>' +
-      '<line x1="100" y1="136" x2="300" y2="136"/><line x1="100" y1="212" x2="300" y2="212"/>' +
-      '<rect x="126" y="92" width="44" height="11" rx="4" fill="#6C7A89"/><rect x="126" y="168" width="44" height="11" rx="4" fill="#6C7A89"/>' +
-      '<rect x="126" y="244" width="44" height="11" rx="4" fill="#6C7A89"/>' +
-      '<g transform="rotate(7 240 172)"><rect x="206" y="140" width="68" height="70" rx="4" fill="#3D6FB6"/>' +
-      '<rect x="222" y="140" width="34" height="20" fill="#DADADA"/>' +
-      '<path d="M218 204 v-26 a22 22 0 0 1 44 0 v26 h-14 v-26 a8 8 0 0 0 -16 0 v26 z" fill="#D9534F"/>' +
-      '<rect x="218" y="194" width="14" height="10" fill="#EEEEEE"/><rect x="248" y="194" width="14" height="10" fill="#EEEEEE"/></g>'
+    right_str: '<path d="M36 100 v-46 a44 44 0 0 1 88 0 v46 h-28 v-46 a16 16 0 0 0 -32 0 v46 z" fill="#D9534F"/><rect x="36" y="82" width="28" height="18" fill="#EEEEEE"/>' +
+      '<rect x="96" y="82" width="28" height="18" fill="#EEEEEE"/>',
+    wrong_arr: [
+      '<rect x="72" y="74" width="16" height="34" rx="5" fill="#E9C27A"/><path d="M50 78 v-40 a30 30 0 0 1 60 0 v40 z" fill="#5BC0DE"/><line x1="68" y1="34" x2="68" y2="62" stroke="#FFFFFF"/>',
+      '<circle cx="80" cy="58" r="26" fill="#F2D25C"/><line x1="80" y1="20" x2="80" y2="6"/><line x1="80" y1="96" x2="80" y2="108"/><line x1="42" y1="58" x2="28" y2="58"/><line x1="118" y1="58" x2="132" y2="58"/>' +
+        '<line x1="53" y1="31" x2="43" y2="21"/><line x1="107" y1="31" x2="117" y2="21"/><line x1="53" y1="85" x2="43" y2="95"/><line x1="107" y1="85" x2="117" y2="95"/>',
+      '<rect x="18" y="30" width="124" height="52" rx="14" fill="#7A6FB0"/><rect x="26" y="70" width="54" height="30" rx="6" fill="#9A90CC"/><rect x="80" y="70" width="54" height="30" rx="6" fill="#9A90CC"/>' +
+        '<rect x="8" y="56" width="22" height="52" rx="8" fill="#7A6FB0"/><rect x="130" y="56" width="22" height="52" rx="8" fill="#7A6FB0"/>'
+    ]
   },
   click: {
     wall_str: '#9AD4F5',
-    desk_str: '#A47551',
-    art_str: '<g transform="rotate(-5 190 180)"><rect x="90" y="76" width="200" height="206" rx="4" fill="#FFF8D6"/>' +
-      '<rect x="90" y="76" width="200" height="26" fill="#D9534F"/>' +
-      '<g stroke-width="2" stroke="#B9C7D8"><line x1="100" y1="140" x2="280" y2="140"/><line x1="100" y1="210" x2="280" y2="210"/><line x1="100" y1="250" x2="280" y2="250"/></g>' +
-      '<text x="190" y="196" text-anchor="middle" font-family="Segoe Script, Bradley Hand, Comic Sans MS, cursive" font-weight="700" font-size="56" fill="#2F4BA0" stroke="none">click</text></g>' +
-      '<g transform="rotate(32 312 200)"><rect x="303" y="130" width="18" height="120" fill="#F2B632"/>' +
-      '<rect x="303" y="130" width="18" height="16" fill="#F29E8E"/><polygon points="303,250 321,250 312,274" fill="#F3EBD3"/></g>'
+    right_str: '<g transform="rotate(50 80 50)">' + fnPencil_str() + '</g><path d="M22 100 q10 -14 20 0 t20 0 t20 0" fill="none" stroke="#2F4BA0"/>',
+    wrong_arr: [
+      '<ellipse cx="78" cy="72" rx="24" ry="34" fill="' + cSkin_str + '" transform="rotate(8 78 72)"/><g fill="' + cSkin_str + '"><circle cx="54" cy="32" r="8"/><circle cx="70" cy="22" r="7"/>' +
+        '<circle cx="86" cy="20" r="6"/><circle cx="99" cy="25" r="5.5"/><circle cx="110" cy="34" r="5"/></g>',
+      fnBubble_str() + '<path d="M118 78 q10 6 6 18" fill="none"/><path d="M132 72 q16 10 8 30" fill="none"/>',
+      '<rect x="72" y="60" width="14" height="48" fill="#7A5C46"/><polygon points="22,18 108,18 140,42 108,66 22,66" fill="#4E9F6B"/>'
+    ]
   },
   printer: {
     wall_str: '#A8D5BA',
-    desk_str: '#6B4E71',
-    art_str: '<polygon points="96,236 164,242 174,290 86,290" fill="' + cBeigeDark_str + '"/>' +
-      '<polygon points="60,112 186,96 186,248 60,232" fill="' + cBeige_str + '"/>' +
-      '<rect x="186" y="100" width="13" height="144" fill="#9AD4F5"/>' +
-      '<line x1="210" y1="150" x2="234" y2="158"/><line x1="210" y1="174" x2="236" y2="176"/><line x1="210" y1="198" x2="234" y2="192"/>' +
-      '<rect x="266" y="150" width="60" height="70" fill="#FFFFFF"/>' +
-      '<rect x="244" y="212" width="100" height="78" rx="8" fill="#C9CDD4"/>' +
-      '<rect x="258" y="258" width="72" height="9" fill="' + cInk_str + '"/>' +
-      '<circle cx="330" cy="230" r="5" fill="#7BC67B"/>'
+    // A pair of glasses, for the screen that cannot see.
+    right_str: '<line x1="20" y1="58" x2="8" y2="42"/><line x1="140" y1="58" x2="152" y2="42"/><circle cx="46" cy="64" r="26" fill="#CDEBFA"/><circle cx="114" cy="64" r="26" fill="#CDEBFA"/>' +
+      '<path d="M72 60 q8 -8 16 0" fill="none"/>',
+    wrong_arr: [
+      '<polygon points="20,24 62,14 100,24 140,14 140,98 100,108 62,98 20,108" fill="' + cPaperWhite_str + '"/><line x1="62" y1="14" x2="62" y2="98" stroke-width="2"/>' +
+        '<line x1="100" y1="24" x2="100" y2="108" stroke-width="2"/><path d="M36 88 q20 -30 40 -14 t34 -24" fill="none" stroke="#D9534F"/>',
+      '<rect x="20" y="20" width="120" height="84" rx="8" fill="#FFFFFF"/><path d="M20 48 v-20 a8 8 0 0 1 8 -8 h104 a8 8 0 0 1 8 8 v20 z" fill="#D9534F"/>' +
+        '<path d="M42 80 q10 -18 20 0 t20 0 t20 0 t16 -6" fill="none"/>',
+      '<rect x="30" y="56" width="100" height="52" rx="10" fill="#D9534F"/><circle cx="80" cy="82" r="16" fill="#F3EBD3"/><circle cx="80" cy="82" r="5" fill="' + cInk_str + '"/>' +
+        '<rect x="16" y="32" width="128" height="28" rx="14" fill="#B63D3A"/>'
+    ]
   }
 };
-
-const cSlotWidth_int = 160;
-const cSlotHeight_int = 108;
-const cSlotOrigins_arr = [[32, 64], [208, 64], [32, 182], [208, 182]];
-const cMainScale_flt = 0.47;
-const cMainCenterX_int = 200;
-const cMainBaseY_int = 290;
-const cOutline_int = 4;
-const cSkin_str = '#F3C9A0';
-const cPaperWhite_str = '#FFFDF6';
-
-// >>>>> fnSlot_str <<<<<
-// Places one small drawing in one of the four places in a picture: two on
-// the wall shelf and two on the desk. A small drawing is drawn in a box 160
-// wide and 108 tall, standing on the bottom edge of that box.
-function fnSlot_str(pSlot_int, pArt_str) {
-  return '<g class="slot" transform="translate(' + cSlotOrigins_arr[pSlot_int][0] + ' ' + cSlotOrigins_arr[pSlot_int][1] + ')">' + pArt_str + '</g>';
-}
-
-// >>>>> fnMainSlot_str <<<<<
-// Shrinks a full-size drawing to fit one of the four places, and thickens
-// its outline by the same amount so it matches the small drawings.
-function fnMainSlot_str(pSlot_int, pArt_str) {
-  const cX_flt = cSlotOrigins_arr[pSlot_int][0] + cSlotWidth_int / 2 - cMainCenterX_int * cMainScale_flt;
-  const cY_flt = cSlotOrigins_arr[pSlot_int][1] + cSlotHeight_int - cMainBaseY_int * cMainScale_flt;
-  return '<g class="slot" transform="translate(' + cX_flt.toFixed(1) + ' ' + cY_flt.toFixed(1) + ') scale(' + cMainScale_flt + ')" stroke-width="' +
-    (cOutline_int / cMainScale_flt).toFixed(1) + '">' + pArt_str + '</g>';
-}
-
-// >>>>> fnRoom_str <<<<<
-// Builds a picture that shows all four endings of a call at the same size:
-// the right ending in the place the caller names, and the three wrong
-// endings in the other three places, on a wall shelf and on the desk.
-function fnRoom_str(pMainSlot_int, pMainArt_str, pProps_arr) {
-  var vArt_str = '<rect x="20" y="172" width="360" height="9" rx="3" fill="#7A5C46"/>';
-  var vNext_int = 0;
-  var vSlot_int;
-  for (vSlot_int = 0; vSlot_int < cSlotOrigins_arr.length; vSlot_int++) {
-    if (vSlot_int === pMainSlot_int) {
-      vArt_str += fnMainSlot_str(vSlot_int, pMainArt_str);
-    } else {
-      vArt_str += fnSlot_str(vSlot_int, pProps_arr[vNext_int]);
-      vNext_int++;
-    }
-  }
-  return vArt_str;
-}
-
-function fnText_str(pX_int, pY_int, pSize_int, pText_str, pFill_str) {
-  return '<text x="' + pX_int + '" y="' + pY_int + '" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="' + pSize_int +
-    '" fill="' + pFill_str + '" stroke="none">' + pText_str + '</text>';
-}
-
-function fnMiniMonitor_str(pScreen_str, pInner_str) {
-  return '<rect x="68" y="84" width="24" height="14" fill="' + cBeigeDark_str + '"/><rect x="48" y="96" width="64" height="12" rx="4" fill="' + cBeige_str + '"/>' +
-    '<rect x="26" y="6" width="108" height="80" rx="9" fill="' + cBeige_str + '"/><rect x="36" y="15" width="88" height="56" rx="4" fill="' + pScreen_str + '"/>' + pInner_str;
-}
-
-function fnMiniKeyboard_str() {
-  const cKeyCount_int = 9;
-  var vKeys_str = '';
-  var vIndex_int;
-  for (vIndex_int = 0; vIndex_int < cKeyCount_int; vIndex_int++) {
-    vKeys_str += '<rect x="' + (20 + vIndex_int * 14) + '" y="80" width="9" height="8"/><rect x="' + (20 + vIndex_int * 14) + '" y="94" width="9" height="8"/>';
-  }
-  return '<rect x="12" y="72" width="136" height="36" rx="6" fill="' + cBeige_str + '"/><g fill="' + cPaperWhite_str + '" stroke-width="2">' + vKeys_str + '</g>';
-}
-
-function fnMiniMouse_str(pX_int, pY_int) {
-  return '<rect x="' + pX_int + '" y="' + pY_int + '" width="30" height="44" rx="15" fill="#FFFFFF"/>' +
-    '<line x1="' + pX_int + '" y1="' + (pY_int + 16) + '" x2="' + (pX_int + 30) + '" y2="' + (pY_int + 16) + '"/>' +
-    '<line x1="' + (pX_int + 15) + '" y1="' + pY_int + '" x2="' + (pX_int + 15) + '" y2="' + (pY_int + 16) + '"/>';
-}
-
-function fnMiniDisk_str(pX_int, pY_int, pSize_int, pFill_str) {
-  return '<rect x="' + pX_int + '" y="' + pY_int + '" width="' + pSize_int + '" height="' + pSize_int + '" rx="3" fill="' + pFill_str + '"/>' +
-    '<rect x="' + (pX_int + pSize_int * 0.25) + '" y="' + pY_int + '" width="' + (pSize_int * 0.45) + '" height="' + (pSize_int * 0.3) + '" fill="#DADADA" stroke-width="2"/>' +
-    '<rect x="' + (pX_int + pSize_int * 0.18) + '" y="' + (pY_int + pSize_int * 0.55) + '" width="' + (pSize_int * 0.64) + '" height="' + (pSize_int * 0.45) + '" fill="#FFF8E7" stroke-width="2"/>';
-}
-
-function fnMiniDrawer_str(pInside_str) {
-  return '<rect x="34" y="20" width="92" height="88" rx="5" fill="#AEB8C2"/><rect x="44" y="28" width="72" height="20" fill="#C3CCD4"/>' +
-    '<rect x="70" y="35" width="20" height="6" rx="3" fill="#6C7A89"/>' + pInside_str +
-    '<rect x="24" y="74" width="112" height="30" rx="4" fill="#C3CCD4"/><rect x="68" y="85" width="24" height="7" rx="3" fill="#6C7A89"/>';
-}
-
-function fnBubble_str(pText_str, pSize_int) {
-  return '<polygon points="60,58 46,86 86,64" fill="#FFFFFF"/><ellipse cx="84" cy="38" rx="60" ry="30" fill="#FFFFFF"/>' +
-    '<line x1="62" y1="62" x2="82" y2="66" stroke="#FFFFFF" stroke-width="6"/>' + fnText_str(84, 38 + Math.round(pSize_int / 3), pSize_int, pText_str, cInk_str);
-}
-
-function fnNameTag_str(pName_str, pSize_int) {
-  return '<rect x="20" y="20" width="120" height="84" rx="8" fill="#FFFFFF"/><path d="M20 48 v-20 a8 8 0 0 1 8 -8 h104 a8 8 0 0 1 8 8 v20 z" fill="#D9534F"/>' +
-    fnText_str(80, 41, 16, 'HELLO', '#FFFFFF') + fnText_str(80, 86, pSize_int, pName_str, cInk_str);
-}
-
-function fnSmiley_str(pX_int) {
-  return '<circle cx="' + pX_int + '" cy="64" r="22" fill="#F2D25C"/><g fill="' + cInk_str + '" stroke="none"><circle cx="' + (pX_int - 8) + '" cy="58" r="3"/><circle cx="' + (pX_int + 8) + '" cy="58" r="3"/></g>' +
-    '<path d="M' + (pX_int - 10) + ' 68 q10 10 20 0" fill="none" stroke-width="3"/>';
-}
-
-// For every call: the place its right ending takes in the picture, and one
-// small drawing for each wrong ending, in the same order as the call's
-// wrong endings. Place 0 and 1 are on the shelf, and 2 and 3 are on the desk.
-const cProps_obj = {
-  floppy: { main_int: 2, props_arr: [
-    fnMiniDisk_str(48, 24, 34, '#3D6FB6') + fnMiniDisk_str(78, 18, 34, '#D9534F') + '<rect x="36" y="50" width="88" height="58" fill="#C99A5B"/>' +
-      '<polygon points="36,50 20,36 40,36" fill="#B9884A"/><polygon points="124,50 140,36 120,36" fill="#B9884A"/>',
-    fnMiniDisk_str(8, 62, 44, '#8E8E8E') + fnMiniDisk_str(58, 62, 44, '#8E8E8E') + fnMiniDisk_str(108, 62, 44, '#8E8E8E'),
-    '<rect x="10" y="30" width="60" height="78" rx="6" fill="' + cBeige_str + '"/><rect x="20" y="56" width="40" height="7" fill="' + cInk_str + '"/>' +
-      '<line x1="74" y1="50" x2="90" y2="46"/><line x1="74" y1="62" x2="88" y2="62"/><g transform="rotate(-15 118 50)">' + fnMiniDisk_str(96, 28, 44, '#4E9F6B') + '</g>'
-  ] },
-  cup: { main_int: 3, props_arr: [
-    '<rect x="76" y="34" width="70" height="74" rx="6" fill="' + cBeige_str + '"/><rect x="76" y="62" width="16" height="14" fill="' + cInk_str + '"/>' +
-      '<rect x="14" y="62" width="56" height="14" fill="#F2B632"/><polygon points="70,62 86,69 70,76" fill="#F3EBD3"/><rect x="14" y="62" width="10" height="14" fill="#F29E8E"/>' +
-      '<path d="M46 92 q8 -8 14 0 q6 8 14 0" fill="none"/>',
-    '<rect x="20" y="8" width="120" height="14" rx="5" fill="' + cBeigeDark_str + '"/><circle cx="80" cy="24" r="7" fill="' + cInk_str + '"/>' +
-      '<path d="M80 28 L52 44 L44 104 H116 L108 44 Z" fill="#3D5A80"/><line x1="80" y1="44" x2="80" y2="104"/>',
-    '<polygon points="56,62 104,62 114,22 82,36 50,18" fill="#FFFFFF"/><rect x="36" y="56" width="88" height="52" rx="6" fill="' + cBeige_str + '"/>' +
-      '<rect x="48" y="66" width="64" height="9" fill="' + cInk_str + '"/>'
-  ] },
-  anykey: { main_int: 1, props_arr: [
-    fnMiniKeyboard_str() + '<rect x="22" y="42" width="50" height="40" rx="16" fill="' + cSkin_str + '"/><rect x="88" y="42" width="50" height="40" rx="16" fill="' + cSkin_str + '"/>' +
-      '<line x1="40" y1="30" x2="36" y2="18"/><line x1="80" y1="30" x2="80" y2="16"/><line x1="120" y1="30" x2="124" y2="18"/>',
-    fnMiniMonitor_str('#1F4E79', '<rect x="64" y="38" width="32" height="26" rx="4" fill="#F2B632"/><path d="M70 38 v-8 a10 10 0 0 1 20 0 v8" fill="none"/>'),
-    '<g transform="translate(0 14)"><path d="M80 14 a30 30 0 0 1 16 55 v9 h-32 v-9 a30 30 0 0 1 16 -55 z" fill="#F2D25C"/><rect x="66" y="78" width="28" height="16" rx="3" fill="#9AA3AD"/>' +
-      '<line x1="34" y1="44" x2="18" y2="44"/><line x1="126" y1="44" x2="142" y2="44"/><line x1="46" y1="14" x2="36" y2="2"/><line x1="114" y1="14" x2="124" y2="2"/></g>'
-  ] },
-  pedal: { main_int: 2, props_arr: [
-    fnMiniMonitor_str('#2F8F9D', '') + fnMiniMouse_str(122, 20) + '<rect x="112" y="36" width="48" height="10" fill="#F2D25C"/>',
-    '<rect x="36" y="46" width="88" height="62" fill="#C99A5B"/><line x1="36" y1="60" x2="124" y2="60"/><rect x="74" y="46" width="12" height="14" fill="#E9D8A6"/>' +
-      '<ellipse cx="78" cy="86" rx="16" ry="11" fill="#FFFFFF"/><path d="M94 86 q12 -2 14 -14" fill="none"/>',
-    fnMiniDrawer_str(fnMiniMouse_str(65, 46))
-  ] },
-  dark: { main_int: 1, props_arr: [
-    '<rect x="8" y="8" width="12" height="100" fill="#6C7A89"/><rect x="20" y="52" width="130" height="14" fill="#7A5C46"/><rect x="128" y="66" width="12" height="42" fill="#7A5C46"/>' +
-      '<path d="M20 28 h16 v24 h34 v16 h-50 z" fill="#9AA3AD"/><circle cx="28" cy="40" r="5" fill="#EEEEEE"/><circle cx="56" cy="60" r="5" fill="#EEEEEE"/>',
-    '<path d="M30 96 q-22 -6 -14 -26" fill="none" stroke="#E8A04C" stroke-width="8"/><ellipse cx="74" cy="88" rx="48" ry="20" fill="#E8A04C"/><circle cx="118" cy="76" r="18" fill="#E8A04C"/>' +
-      '<polygon points="104,66 106,48 118,60" fill="#E8A04C"/><polygon points="122,60 134,48 134,68" fill="#E8A04C"/>' +
-      '<path d="M108 78 q4 4 8 0" fill="none" stroke-width="3"/><path d="M122 78 q4 4 8 0" fill="none" stroke-width="3"/>' + fnText_str(64, 52, 24, 'z z', '#F5E9A8'),
-    '<rect x="24" y="50" width="34" height="58" fill="#3A3F5C"/><rect x="62" y="22" width="38" height="86" fill="#4A5078"/><rect x="104" y="58" width="34" height="50" fill="#3A3F5C"/>' +
-      '<g fill="#F5E9A8" stroke="none"><rect x="32" y="60" width="7" height="8"/><rect x="44" y="76" width="7" height="8"/><rect x="70" y="34" width="8" height="9"/><rect x="84" y="34" width="8" height="9"/>' +
-      '<rect x="70" y="56" width="8" height="9"/><rect x="84" y="78" width="8" height="9"/><rect x="112" y="68" width="7" height="8"/><rect x="124" y="84" width="7" height="8"/></g>'
-  ] },
-  photocopy: { main_int: 3, props_arr: [
-    '<g transform="rotate(-6 68 64)"><rect x="30" y="18" width="78" height="90" fill="#FFFFFF"/>' +
-      '<path d="M48 42 l40 -3 l3 42 l-42 2 z M58 41 l2 12 l18 -1 l-1 -12" fill="none" stroke="#D9534F" stroke-width="5"/></g>' +
-      '<g transform="rotate(28 128 70)"><rect x="120" y="36" width="16" height="58" fill="#3D6FB6"/><polygon points="120,94 136,94 128,108" fill="#3D6FB6"/></g>',
-    '<rect x="108" y="52" width="34" height="36" fill="' + cBeige_str + '"/><rect x="20" y="46" width="110" height="62" rx="18" fill="#5BC0DE"/>' +
-      '<line x1="48" y1="48" x2="48" y2="106" stroke="#FFFFFF"/><line x1="64" y1="48" x2="64" y2="106" stroke="#FFFFFF"/><path d="M92 46 q-14 -22 6 -24 q18 0 6 24" fill="#5BC0DE"/>',
-    '<g transform="rotate(5 80 60)"><rect x="40" y="12" width="80" height="96" fill="#FFFFFF"/><rect x="48" y="20" width="64" height="62" fill="#9AD4F5"/>' +
-      '<path d="M58 82 v-10 a22 18 0 0 1 44 0 v10 z" fill="#E4572E"/><circle cx="80" cy="44" r="13" fill="' + cSkin_str + '"/>' + fnMiniDisk_str(94, 58, 18, '#3D6FB6') + '</g>'
-  ] },
-  windows: { main_int: 0, props_arr: [
-    '<rect x="68" y="84" width="24" height="14" fill="' + cBeigeDark_str + '"/><rect x="48" y="96" width="64" height="12" rx="4" fill="' + cBeige_str + '"/>' +
-      '<rect x="26" y="6" width="108" height="80" rx="9" fill="' + cBeigeDark_str + '"/><line x1="44" y1="24" x2="116" y2="24"/><line x1="44" y1="38" x2="116" y2="38"/>' +
-      '<line x1="44" y1="52" x2="116" y2="52"/><rect x="70" y="62" width="20" height="14" fill="' + cInk_str + '"/><path d="M80 76 q4 24 60 26" fill="none"/>',
-    '<rect x="14" y="26" width="46" height="62" rx="6" fill="' + cPaperWhite_str + '"/><line x1="30" y1="44" x2="30" y2="58"/><line x1="44" y1="44" x2="44" y2="58"/>' +
-      '<line x1="78" y1="50" x2="94" y2="50"/><line x1="78" y1="66" x2="94" y2="66"/><rect x="94" y="42" width="30" height="32" rx="6" fill="#9AA3AD"/><path d="M124 58 q24 0 20 50" fill="none"/>',
-    '<circle cx="80" cy="62" r="42" fill="' + cSkin_str + '"/><path d="M40 48 a42 42 0 0 1 80 0 q-40 -22 -80 0 z" fill="#4A2F23"/>' +
-      '<path d="M56 62 q8 8 16 0" fill="none"/><path d="M88 62 q8 8 16 0" fill="none"/><path d="M68 82 q12 8 24 0" fill="none"/>'
-  ] },
-  whiteout: { main_int: 2, props_arr: [
-    '<rect x="30" y="50" width="26" height="30" fill="#F2D25C" transform="rotate(-8 43 65)"/><rect x="68" y="46" width="26" height="30" fill="#F29E8E"/>' +
-      '<rect x="104" y="50" width="26" height="30" fill="#B7D7A8" transform="rotate(8 117 65)"/>' + fnMiniKeyboard_str(),
-    '<g transform="rotate(12 76 58)"><rect x="46" y="28" width="60" height="60" rx="6" fill="#E9C27A"/><g fill="' + cInk_str + '" stroke="none"><circle cx="62" cy="44" r="3"/>' +
-      '<circle cx="90" cy="44" r="3"/><circle cx="76" cy="58" r="3"/><circle cx="62" cy="72" r="3"/><circle cx="90" cy="72" r="3"/></g></g>' +
-      '<g fill="#E9C27A" stroke-width="2"><circle cx="128" cy="98" r="5"/><circle cx="140" cy="84" r="3"/><circle cx="26" cy="100" r="4"/><circle cx="114" cy="104" r="3"/></g>',
-    fnMiniDrawer_str('<rect x="38" y="54" width="84" height="30" rx="4" fill="' + cBeige_str + '"/><g fill="' + cPaperWhite_str + '" stroke-width="2"><rect x="46" y="59" width="10" height="8"/>' +
-      '<rect x="60" y="59" width="10" height="8"/><rect x="74" y="59" width="10" height="8"/><rect x="88" y="59" width="10" height="8"/><rect x="102" y="59" width="10" height="8"/></g>')
-  ] },
-  fax: { main_int: 1, props_arr: [
-    '<rect x="24" y="84" width="112" height="24" rx="6" fill="#9AA3AD"/><rect x="72" y="72" width="16" height="14" fill="#6C7A89"/><circle cx="80" cy="44" r="30" fill="#FFFFFF"/>' +
-      '<line x1="80" y1="44" x2="96" y2="26"/><circle cx="80" cy="44" r="4" fill="' + cInk_str + '"/>',
-    '<g transform="rotate(-5 80 64)"><rect x="32" y="20" width="96" height="88" fill="#FFFFFF"/><rect x="96" y="28" width="24" height="28" fill="#D9534F"/>' +
-      '<g stroke-width="3"><line x1="44" y1="68" x2="116" y2="68"/><line x1="44" y1="82" x2="116" y2="82"/><line x1="44" y1="96" x2="92" y2="96"/></g></g>',
-    '<path d="M8 98 q8 -16 16 0 t16 0 t16 0 t16 0" fill="none"/><rect x="100" y="8" width="20" height="74" rx="10" fill="#FFFFFF"/><circle cx="110" cy="88" r="18" fill="#D9534F"/>' +
-      '<rect x="106" y="46" width="8" height="34" fill="#D9534F" stroke="none"/>'
-  ] },
-  mousescreen: { main_int: 0, props_arr: [
-    '<g transform="rotate(35 80 60)"><rect x="70" y="14" width="20" height="74" rx="4" fill="#3D6FB6"/><rect x="74" y="2" width="12" height="12" fill="#9AA3AD"/>' +
-      '<polygon points="70,88 90,88 80,106" fill="#9AA3AD"/><line x1="94" y1="20" x2="94" y2="48"/></g><path d="M120 14 q10 4 10 14" fill="none"/><path d="M130 4 q16 8 16 24" fill="none"/>',
-    fnBubble_str('OK!', 30) + '<ellipse cx="116" cy="94" rx="24" ry="13" fill="#FFFFFF"/><line x1="108" y1="82" x2="108" y2="106"/>',
-    fnMiniKeyboard_str() + '<line x1="20" y1="48" x2="44" y2="48"/><line x1="14" y1="60" x2="40" y2="60"/><g transform="rotate(62 86 56)">' + fnMiniMouse_str(71, 34) + '</g>'
-  ] },
-  mycomputer: { main_int: 3, props_arr: [
-    '<rect x="62" y="24" width="18" height="46" rx="9" fill="' + cSkin_str + '"/><rect x="50" y="56" width="60" height="48" rx="14" fill="' + cSkin_str + '"/>' +
-      '<line x1="80" y1="62" x2="80" y2="78"/><line x1="94" y1="62" x2="94" y2="78"/><line x1="46" y1="22" x2="38" y2="14"/><line x1="71" y1="14" x2="71" y2="4"/><line x1="96" y1="22" x2="104" y2="14"/>',
-    '<circle cx="40" cy="70" r="28" fill="' + cPaperWhite_str + '"/><circle cx="120" cy="70" r="28" fill="' + cPaperWhite_str + '"/>' +
-      fnText_str(40, 82, 34, '1', cInk_str) + fnText_str(120, 82, 34, '2', cInk_str) + fnText_str(80, 34, 34, '?', cInk_str),
-    '<path d="M80 30 q-10 -24 24 -26" fill="none"/><rect x="54" y="30" width="52" height="76" rx="26" fill="#FFFFFF"/><line x1="54" y1="60" x2="106" y2="60"/><line x1="80" y1="30" x2="80" y2="60"/>'
-  ] },
-  stars: { main_int: 2, props_arr: [
-    '<g transform="rotate(-4 80 62)"><rect x="16" y="26" width="128" height="72" fill="#F2D25C"/>' + fnText_str(80, 70, 23, 'password', cInk_str) + '</g>',
-    fnNameTag_str('nnA', 32),
-    fnSmiley_str(30) + fnSmiley_str(80) + fnSmiley_str(130)
-  ] },
-  magnet: { main_int: 1, props_arr: [
-    '<rect x="44" y="6" width="72" height="102" rx="6" fill="#FFFFFF"/><line x1="44" y1="46" x2="116" y2="46"/><rect x="102" y="16" width="6" height="20" fill="' + cInk_str + '" stroke="none"/>' +
-      '<rect x="102" y="56" width="6" height="26" fill="' + cInk_str + '" stroke="none"/><g stroke="#3D6FB6"><line x1="72" y1="12" x2="72" y2="40"/><line x1="60" y1="19" x2="84" y2="33"/><line x1="60" y1="33" x2="84" y2="19"/></g>',
-    '<circle cx="128" cy="26" r="14" fill="#F2D25C"/><line x1="106" y1="26" x2="98" y2="26"/><line x1="112" y1="10" x2="106" y2="4"/><line x1="128" y1="48" x2="128" y2="56"/>' +
-      '<g transform="rotate(-8 100 62)">' + fnMiniDisk_str(86, 50, 28, '#3D6FB6') + '</g><path d="M10 108 v-30 q70 -22 140 0 v30 z" fill="#4F6D7A"/>' +
-      '<circle cx="42" cy="90" r="20" fill="none" stroke-width="6"/>',
-    '<rect x="18" y="30" width="124" height="52" rx="14" fill="#7A6FB0"/>' + fnMiniDisk_str(67, 50, 26, '#3D6FB6') +
-      '<rect x="26" y="70" width="54" height="30" rx="6" fill="#9A90CC"/><rect x="80" y="70" width="54" height="30" rx="6" fill="#9A90CC"/>' +
-      '<rect x="8" y="56" width="22" height="52" rx="8" fill="#7A6FB0"/><rect x="130" y="56" width="22" height="52" rx="8" fill="#7A6FB0"/>'
-  ] },
-  click: { main_int: 3, props_arr: [
-    '<path d="M30 100 q0 -34 40 -38 l14 -40 h30 v78 z" fill="#4A2F23"/><rect x="26" y="96" width="92" height="12" rx="5" fill="' + cInk_str + '"/>' + fnText_str(97, 80, 26, 'R', '#FFFFFF'),
-    fnBubble_str('click!', 26) + '<path d="M118 78 q10 6 6 18" fill="none"/><path d="M132 72 q16 10 8 30" fill="none"/>',
-    fnMiniMouse_str(14, 58) + '<line x1="58" y1="80" x2="112" y2="80" stroke-width="6"/><polygon points="112,66 140,80 112,94" fill="' + cInk_str + '"/>'
-  ] },
-  printer: { main_int: 0, props_arr: [
-    '<polygon points="20,24 62,14 100,24 140,14 140,98 100,108 62,98 20,108" fill="' + cPaperWhite_str + '"/><line x1="62" y1="14" x2="62" y2="98" stroke-width="2"/>' +
-      '<line x1="100" y1="24" x2="100" y2="108" stroke-width="2"/><path d="M36 88 q20 -30 40 -14 t34 -24" fill="none" stroke="#D9534F"/>' +
-      '<path d="M108 32 l14 14 M122 32 l-14 14" fill="none" stroke="#D9534F"/>',
-    fnNameTag_str('PRINTER', 20),
-    '<rect x="30" y="56" width="100" height="52" rx="10" fill="#D9534F"/><circle cx="80" cy="82" r="16" fill="#F3EBD3"/><circle cx="80" cy="82" r="5" fill="' + cInk_str + '"/>' +
-      '<rect x="16" y="32" width="128" height="28" rx="14" fill="#B63D3A"/>'
-  ] }
-};
-
-Object.keys(cProps_obj).forEach(function (pId_str) {
-  cScenes_obj[pId_str].art_str = fnRoom_str(cProps_obj[pId_str].main_int, cScenes_obj[pId_str].art_str, cProps_obj[pId_str].props_arr);
-});
 
 // Every call has one right ending and three wrong ones. The page shuffles
 // the four each time, so a round always has exactly one right answer.
@@ -995,6 +806,13 @@ const cQuestions_arr = [
 ];
 </script>
 
+<script id="game-voice">
+// The caller's two lines, recorded once and stored inside the page, so the
+// page still loads nothing from outside.
+const cThanksVoice_str = 'data:audio/mpeg;base64,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//NkxC0aoroUCHhGvd88FzM/7zz0JkLI3Pegqhf5ZvknNF1lPrmdMxawZq6yQL4xj2wn51fbNSn/em9an2+y2X8715mHNQBbHKsKADgIcgPHzATMx1SVctfZvZm9SlKpjGMZ/5ja0MYxv5Wy/MZzFK0pSlKYxjP/0N5aGN/oYxW7oapSlARIK4NA0DTsGjwd//NkxEUZajYFSmDEGA6VBUGhKCp2ViI9LPhQKB2JT2sFqjy+DR7pLHp0Q8RArUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NkxGIAAANIAAAAAFVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NkxHwAAANIAAAAAFVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NkxHwAAANIAAAAAFVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NkxHwAAANIAAAAAFVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NkxHwAAANIAAAAAFVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NkxHwAAANIAAAAAFVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NkxHwAAANIAAAAAFVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NkxHwAAANIAAAAAFVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NkxHwAAANIAAAAAFVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NkxHwAAANIAAAAAFVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NkxHwAAANIAAAAAFVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NkxHwAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
+const cStillVoice_str = 'data:audio/mpeg;base64,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qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxPEf/Cno4ECHCaqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqpMQU1FMy4xMDCqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq//NkxHwAAANIAAAAAKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq';
+</script>
+
 <script>
 // The game itself: it deals a shift of calls, shows one call at a time over
 // its picture, checks the tap, and keeps score.
@@ -1004,11 +822,29 @@ const cDefaultLengthIndex_int = 1;
 const cFirstTicketNumber_int = 1042;
 const cLetters_arr = ['A', 'B', 'C', 'D'];
 const cSeniorShare_flt = 0.6;
+const cPicRows_int = 3;
+const cPicsPerRow_int = 2;
+const cMaxTilt_int = 8;
+const cMaxShift_int = 12;
+// The ring: three bursts of a fast two-tone warble, at a medium pitch, then
+// a low one, then a high one, like an office desk phone's electronic ringer.
+const cRingPitches_arr = [1000, 800, 1250];
+const cRingWarbleRatio_flt = 1.25;
+const cRingWarbleStep_flt = 1 / 32;
+const cRingBurstLength_flt = 0.38;
+const cRingBurstGap_flt = 0.5;
+const cRingVolume_flt = 0.05;
+const cRingFade_flt = 0.015;
+const cRingSoftenHz_int = 2800;
 
 var gLength_int;
 var gDeck_arr;
 var gIndex_int;
 var gScore_int;
+var gIsSoundOn_bol;
+var gAudio_obj;
+var gRing_arr;
+var gVoice_obj;
 
 // >>>>> fnMyLogger <<<<<
 // The browser version of the logger. A web page cannot reach the log
@@ -1059,8 +895,8 @@ function fnShuffle_arr(pItems_arr) {
 }
 
 // >>>>> fnShowScene <<<<<
-// Paints the picture for one call behind the game, along with its wall and
-// desk colors.
+// Paints the ringing phone behind the start and end screens, along with its
+// wall and desk colors.
 function fnShowScene(pId_str) {
   var vValues_str = pId_str;
   var vIsError_bol = true;
@@ -1087,10 +923,174 @@ function fnShowScreen(pName_str) {
     ['start', 'play', 'end'].forEach(function (pEach_str) {
       fnElement_obj('screen-' + pEach_str).hidden = pEach_str !== pName_str;
     });
-    fnElement_obj('bar').hidden = pName_str !== 'play';
+    fnElement_obj('call-count').hidden = pName_str !== 'play';
+    fnElement_obj('score').hidden = pName_str !== 'play';
+    fnStopSounds();
     window.scrollTo(0, 0);
   } catch (vError_obj) {
     fnMyLogger(vError_obj, 'fnShowScreen', vValues_str, fnLineNumber_int(vError_obj), vIsError_bol);
+  }
+}
+
+// >>>>> fnShowPictures <<<<<
+// Scatters a call's four small pictures around its two cards. Each of the
+// three rows gets at least one picture, so they never bunch up at the top,
+// and which picture lands where is random, as are its tilt and its nudge to
+// one side. The wall color fills the whole screen behind them.
+function fnShowPictures(pId_str) {
+  var vValues_str = pId_str;
+  var vIsError_bol = true;
+  var vScene_obj;
+  var vArts_arr;
+  var vCells_arr;
+  var vPlaces_arr = [];
+  var vSpare_arr = [];
+  var vRow_int;
+  var vPick_int;
+  var vCell_int;
+  try {
+    vScene_obj = cScenes_obj[pId_str];
+    document.documentElement.style.setProperty('--wall', vScene_obj.wall_str);
+    document.documentElement.style.setProperty('--desk', vScene_obj.wall_str);
+    fnElement_obj('scene').innerHTML = '';
+    vArts_arr = fnShuffle_arr([vScene_obj.right_str].concat(vScene_obj.wrong_arr));
+    for (vRow_int = 0; vRow_int < cPicRows_int; vRow_int++) {
+      vPick_int = Math.floor(Math.random() * cPicsPerRow_int);
+      for (vCell_int = 0; vCell_int < cPicsPerRow_int; vCell_int++) {
+        if (vCell_int === vPick_int) {
+          vPlaces_arr.push(vRow_int * cPicsPerRow_int + vCell_int);
+        } else {
+          vSpare_arr.push(vRow_int * cPicsPerRow_int + vCell_int);
+        }
+      }
+    }
+    vPlaces_arr = vPlaces_arr.concat(fnShuffle_arr(vSpare_arr).slice(0, vArts_arr.length - vPlaces_arr.length));
+    vCells_arr = Array.prototype.slice.call(document.querySelectorAll('.pic'));
+    vCells_arr.forEach(function (pCell_obj) {
+      pCell_obj.innerHTML = '';
+    });
+    vArts_arr.forEach(function (pArt_str, pIndex_int) {
+      var vCell_obj = vCells_arr[vPlaces_arr[pIndex_int]];
+      var vTilt_int = Math.round((Math.random() * 2 - 1) * cMaxTilt_int);
+      var vShift_int = Math.round((Math.random() * 2 - 1) * cMaxShift_int);
+      vCell_obj.innerHTML = '<svg viewBox="-8 -8 176 124" xmlns="http://www.w3.org/2000/svg">' +
+        '<g stroke="' + cInk_str + '" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">' + pArt_str + '</g></svg>';
+      vCell_obj.style.transform = 'translateX(' + vShift_int + 'px) rotate(' + vTilt_int + 'deg)';
+    });
+  } catch (vError_obj) {
+    fnMyLogger(vError_obj, 'fnShowPictures', vValues_str, fnLineNumber_int(vError_obj), vIsError_bol);
+  }
+}
+
+// >>>>> fnStopSounds <<<<<
+// Cuts off the ring and the caller's voice, so sounds never pile up.
+function fnStopSounds() {
+  var vValues_str = '';
+  var vIsError_bol = true;
+  try {
+    (gRing_arr || []).forEach(function (pTone_obj) {
+      pTone_obj.onended = null;
+      pTone_obj.stop();
+    });
+    gRing_arr = [];
+    if (gVoice_obj) {
+      gVoice_obj.pause();
+      gVoice_obj = null;
+    }
+  } catch (vError_obj) {
+    fnMyLogger(vError_obj, 'fnStopSounds', vValues_str, fnLineNumber_int(vError_obj), vIsError_bol);
+  }
+}
+
+// >>>>> fnPlayRing <<<<<
+// Plays the phone's ring when a new call comes up. The browser makes the
+// sound itself from the pitches at the top of this block.
+function fnPlayRing() {
+  var vValues_str = '';
+  var vIsError_bol = true;
+  var vAudioClass_fnc;
+  var vStart_flt;
+  try {
+    fnStopSounds();
+    vAudioClass_fnc = window.AudioContext || window.webkitAudioContext;
+    if (!gIsSoundOn_bol || !vAudioClass_fnc) {
+      return;
+    }
+    if (!gAudio_obj) {
+      gAudio_obj = new vAudioClass_fnc();
+    }
+    if (gAudio_obj.state === 'suspended') {
+      gAudio_obj.resume();
+    }
+    vStart_flt = gAudio_obj.currentTime + 0.05;
+    cRingPitches_arr.forEach(function (pPitch_int, pBurst_int) {
+      var vTone_obj = gAudio_obj.createOscillator();
+      var vVolume_obj = gAudio_obj.createGain();
+      var vSoften_obj = gAudio_obj.createBiquadFilter();
+      var vBegin_flt = vStart_flt + pBurst_int * cRingBurstGap_flt;
+      var vEnd_flt = vBegin_flt + cRingBurstLength_flt;
+      var vStep_int = 0;
+      var vAt_flt;
+      vTone_obj.type = 'square';
+      for (vAt_flt = vBegin_flt; vAt_flt < vEnd_flt; vAt_flt += cRingWarbleStep_flt) {
+        vTone_obj.frequency.setValueAtTime(vStep_int % 2 === 0 ? pPitch_int : pPitch_int * cRingWarbleRatio_flt, vAt_flt);
+        vStep_int++;
+      }
+      vVolume_obj.gain.setValueAtTime(0, vBegin_flt);
+      vVolume_obj.gain.linearRampToValueAtTime(cRingVolume_flt, vBegin_flt + cRingFade_flt);
+      vVolume_obj.gain.setValueAtTime(cRingVolume_flt, vEnd_flt - cRingFade_flt);
+      vVolume_obj.gain.linearRampToValueAtTime(0, vEnd_flt);
+      vSoften_obj.type = 'lowpass';
+      vSoften_obj.frequency.value = cRingSoftenHz_int;
+      vTone_obj.connect(vSoften_obj);
+      vSoften_obj.connect(vVolume_obj);
+      vVolume_obj.connect(gAudio_obj.destination);
+      vTone_obj.start(vBegin_flt);
+      vTone_obj.stop(vEnd_flt);
+      gRing_arr.push(vTone_obj);
+    });
+  } catch (vError_obj) {
+    fnMyLogger(vError_obj, 'fnPlayRing', vValues_str, fnLineNumber_int(vError_obj), vIsError_bol);
+  }
+}
+
+// >>>>> fnPlayVoice <<<<<
+// Plays the caller's reply after an answer: thanks for a right one, and a
+// puzzled line for a wrong one. A browser that refuses to play it is only
+// noted in the console, because the game works the same without sound.
+function fnPlayVoice(pIsRight_bol) {
+  var vValues_str = String(pIsRight_bol);
+  var vIsError_bol = true;
+  try {
+    fnStopSounds();
+    if (!gIsSoundOn_bol) {
+      return;
+    }
+    gVoice_obj = new Audio(pIsRight_bol ? cThanksVoice_str : cStillVoice_str);
+    gVoice_obj.play().catch(function (pReason_obj) {
+      fnMyLogger(pReason_obj, 'fnPlayVoice', vValues_str, 'N/A', false);
+    });
+  } catch (vError_obj) {
+    fnMyLogger(vError_obj, 'fnPlayVoice', vValues_str, fnLineNumber_int(vError_obj), vIsError_bol);
+  }
+}
+
+// >>>>> fnToggleSound <<<<<
+// Turns the sounds on or off and shows which on the button.
+function fnToggleSound() {
+  var vValues_str = '';
+  var vIsError_bol = true;
+  var vButton_obj;
+  try {
+    gIsSoundOn_bol = !gIsSoundOn_bol;
+    if (!gIsSoundOn_bol) {
+      fnStopSounds();
+    }
+    vButton_obj = fnElement_obj('sound');
+    vButton_obj.textContent = gIsSoundOn_bol ? 'Sound On' : 'Sound Off';
+    vButton_obj.setAttribute('aria-pressed', String(gIsSoundOn_bol));
+  } catch (vError_obj) {
+    fnMyLogger(vError_obj, 'fnToggleSound', vValues_str, fnLineNumber_int(vError_obj), vIsError_bol);
   }
 }
 
@@ -1135,7 +1135,7 @@ function fnShowBar() {
 }
 
 // >>>>> fnShowQuestion <<<<<
-// Shows the current call: its picture, its story, and its four endings in a
+// Shows the current call: its pictures, its story, and its four endings in a
 // fresh order. Exactly one of the four buttons carries the right ending.
 function fnShowQuestion() {
   var vValues_str = String(gIndex_int);
@@ -1150,7 +1150,7 @@ function fnShowQuestion() {
         return { text_str: pText_str, isRight_bol: false };
       })
     ));
-    fnShowScene(vQuestion_obj.id_str);
+    fnShowPictures(vQuestion_obj.id_str);
     fnShowBar();
     fnElement_obj('ticket-tag').textContent = 'Ticket #' + (cFirstTicketNumber_int + gIndex_int) + ' · ' + vQuestion_obj.subject_str;
     fnElement_obj('story').textContent = vQuestion_obj.story_str;
@@ -1176,6 +1176,7 @@ function fnShowQuestion() {
       vHolder_obj.appendChild(vButton_obj);
     });
     window.scrollTo(0, 0);
+    fnPlayRing();
   } catch (vError_obj) {
     fnMyLogger(vError_obj, 'fnShowQuestion', vValues_str, fnLineNumber_int(vError_obj), vIsError_bol);
   }
@@ -1194,6 +1195,7 @@ function fnChoose(pButton_obj) {
   try {
     vIsRight_bol = pButton_obj.dataset.right === 'true';
     vIsLast_bol = gIndex_int === gDeck_arr.length - 1;
+    fnPlayVoice(vIsRight_bol);
     Array.prototype.forEach.call(fnElement_obj('answers').children, function (pEach_obj) {
       pEach_obj.disabled = true;
       if (pEach_obj.dataset.right === 'true') {
@@ -1306,6 +1308,9 @@ function fnInit() {
   var vIsError_bol = true;
   try {
     gLength_int = cLengths_arr[cDefaultLengthIndex_int].count_int;
+    gIsSoundOn_bol = true;
+    gRing_arr = [];
+    fnElement_obj('sound').addEventListener('click', fnToggleSound);
     fnElement_obj('start').addEventListener('click', fnDealGame);
     fnElement_obj('next').addEventListener('click', fnNext);
     fnElement_obj('again').addEventListener('click', fnDealGame);
