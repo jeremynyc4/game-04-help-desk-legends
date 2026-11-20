@@ -271,7 +271,7 @@
     <div class="panel">
       <p class="tag">Now Hiring: Help Desk</p>
       <h1>Help Desk Legends</h1>
-      <p>The phone is ringing. Read each call and tap how the story ends. The picture behind each call is a hint.</p>
+      <p>The phone is ringing. Read each call and tap how the story ends.</p>
       <p class="small">These are tall tales that tech workers have passed around for years. Most of them probably never happened.</p>
       <div class="lengths" id="lengths" role="group" aria-label="How many calls"></div>
       <button class="go" id="start" type="button">Start My Shift</button>
@@ -568,6 +568,231 @@ const cScenes_obj = {
       '<circle cx="330" cy="230" r="5" fill="#7BC67B"/>'
   }
 };
+
+const cSlotWidth_int = 160;
+const cSlotHeight_int = 108;
+const cSlotOrigins_arr = [[32, 64], [208, 64], [32, 182], [208, 182]];
+const cMainScale_flt = 0.47;
+const cMainCenterX_int = 200;
+const cMainBaseY_int = 290;
+const cOutline_int = 4;
+const cSkin_str = '#F3C9A0';
+const cPaperWhite_str = '#FFFDF6';
+
+// >>>>> fnSlot_str <<<<<
+// Places one small drawing in one of the four places in a picture: two on
+// the wall shelf and two on the desk. A small drawing is drawn in a box 160
+// wide and 108 tall, standing on the bottom edge of that box.
+function fnSlot_str(pSlot_int, pArt_str) {
+  return '<g class="slot" transform="translate(' + cSlotOrigins_arr[pSlot_int][0] + ' ' + cSlotOrigins_arr[pSlot_int][1] + ')">' + pArt_str + '</g>';
+}
+
+// >>>>> fnMainSlot_str <<<<<
+// Shrinks a full-size drawing to fit one of the four places, and thickens
+// its outline by the same amount so it matches the small drawings.
+function fnMainSlot_str(pSlot_int, pArt_str) {
+  const cX_flt = cSlotOrigins_arr[pSlot_int][0] + cSlotWidth_int / 2 - cMainCenterX_int * cMainScale_flt;
+  const cY_flt = cSlotOrigins_arr[pSlot_int][1] + cSlotHeight_int - cMainBaseY_int * cMainScale_flt;
+  return '<g class="slot" transform="translate(' + cX_flt.toFixed(1) + ' ' + cY_flt.toFixed(1) + ') scale(' + cMainScale_flt + ')" stroke-width="' +
+    (cOutline_int / cMainScale_flt).toFixed(1) + '">' + pArt_str + '</g>';
+}
+
+// >>>>> fnRoom_str <<<<<
+// Builds a picture that shows all four endings of a call at the same size:
+// the right ending in the place the caller names, and the three wrong
+// endings in the other three places, on a wall shelf and on the desk.
+function fnRoom_str(pMainSlot_int, pMainArt_str, pProps_arr) {
+  var vArt_str = '<rect x="20" y="172" width="360" height="9" rx="3" fill="#7A5C46"/>';
+  var vNext_int = 0;
+  var vSlot_int;
+  for (vSlot_int = 0; vSlot_int < cSlotOrigins_arr.length; vSlot_int++) {
+    if (vSlot_int === pMainSlot_int) {
+      vArt_str += fnMainSlot_str(vSlot_int, pMainArt_str);
+    } else {
+      vArt_str += fnSlot_str(vSlot_int, pProps_arr[vNext_int]);
+      vNext_int++;
+    }
+  }
+  return vArt_str;
+}
+
+function fnText_str(pX_int, pY_int, pSize_int, pText_str, pFill_str) {
+  return '<text x="' + pX_int + '" y="' + pY_int + '" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="' + pSize_int +
+    '" fill="' + pFill_str + '" stroke="none">' + pText_str + '</text>';
+}
+
+function fnMiniMonitor_str(pScreen_str, pInner_str) {
+  return '<rect x="68" y="84" width="24" height="14" fill="' + cBeigeDark_str + '"/><rect x="48" y="96" width="64" height="12" rx="4" fill="' + cBeige_str + '"/>' +
+    '<rect x="26" y="6" width="108" height="80" rx="9" fill="' + cBeige_str + '"/><rect x="36" y="15" width="88" height="56" rx="4" fill="' + pScreen_str + '"/>' + pInner_str;
+}
+
+function fnMiniKeyboard_str() {
+  const cKeyCount_int = 9;
+  var vKeys_str = '';
+  var vIndex_int;
+  for (vIndex_int = 0; vIndex_int < cKeyCount_int; vIndex_int++) {
+    vKeys_str += '<rect x="' + (20 + vIndex_int * 14) + '" y="80" width="9" height="8"/><rect x="' + (20 + vIndex_int * 14) + '" y="94" width="9" height="8"/>';
+  }
+  return '<rect x="12" y="72" width="136" height="36" rx="6" fill="' + cBeige_str + '"/><g fill="' + cPaperWhite_str + '" stroke-width="2">' + vKeys_str + '</g>';
+}
+
+function fnMiniMouse_str(pX_int, pY_int) {
+  return '<rect x="' + pX_int + '" y="' + pY_int + '" width="30" height="44" rx="15" fill="#FFFFFF"/>' +
+    '<line x1="' + pX_int + '" y1="' + (pY_int + 16) + '" x2="' + (pX_int + 30) + '" y2="' + (pY_int + 16) + '"/>' +
+    '<line x1="' + (pX_int + 15) + '" y1="' + pY_int + '" x2="' + (pX_int + 15) + '" y2="' + (pY_int + 16) + '"/>';
+}
+
+function fnMiniDisk_str(pX_int, pY_int, pSize_int, pFill_str) {
+  return '<rect x="' + pX_int + '" y="' + pY_int + '" width="' + pSize_int + '" height="' + pSize_int + '" rx="3" fill="' + pFill_str + '"/>' +
+    '<rect x="' + (pX_int + pSize_int * 0.25) + '" y="' + pY_int + '" width="' + (pSize_int * 0.45) + '" height="' + (pSize_int * 0.3) + '" fill="#DADADA" stroke-width="2"/>' +
+    '<rect x="' + (pX_int + pSize_int * 0.18) + '" y="' + (pY_int + pSize_int * 0.55) + '" width="' + (pSize_int * 0.64) + '" height="' + (pSize_int * 0.45) + '" fill="#FFF8E7" stroke-width="2"/>';
+}
+
+function fnMiniDrawer_str(pInside_str) {
+  return '<rect x="34" y="20" width="92" height="88" rx="5" fill="#AEB8C2"/><rect x="44" y="28" width="72" height="20" fill="#C3CCD4"/>' +
+    '<rect x="70" y="35" width="20" height="6" rx="3" fill="#6C7A89"/>' + pInside_str +
+    '<rect x="24" y="74" width="112" height="30" rx="4" fill="#C3CCD4"/><rect x="68" y="85" width="24" height="7" rx="3" fill="#6C7A89"/>';
+}
+
+function fnBubble_str(pText_str, pSize_int) {
+  return '<polygon points="60,58 46,86 86,64" fill="#FFFFFF"/><ellipse cx="84" cy="38" rx="60" ry="30" fill="#FFFFFF"/>' +
+    '<line x1="62" y1="62" x2="82" y2="66" stroke="#FFFFFF" stroke-width="6"/>' + fnText_str(84, 38 + Math.round(pSize_int / 3), pSize_int, pText_str, cInk_str);
+}
+
+function fnNameTag_str(pName_str, pSize_int) {
+  return '<rect x="20" y="20" width="120" height="84" rx="8" fill="#FFFFFF"/><path d="M20 48 v-20 a8 8 0 0 1 8 -8 h104 a8 8 0 0 1 8 8 v20 z" fill="#D9534F"/>' +
+    fnText_str(80, 41, 16, 'HELLO', '#FFFFFF') + fnText_str(80, 86, pSize_int, pName_str, cInk_str);
+}
+
+function fnSmiley_str(pX_int) {
+  return '<circle cx="' + pX_int + '" cy="64" r="22" fill="#F2D25C"/><g fill="' + cInk_str + '" stroke="none"><circle cx="' + (pX_int - 8) + '" cy="58" r="3"/><circle cx="' + (pX_int + 8) + '" cy="58" r="3"/></g>' +
+    '<path d="M' + (pX_int - 10) + ' 68 q10 10 20 0" fill="none" stroke-width="3"/>';
+}
+
+// For every call: the place its right ending takes in the picture, and one
+// small drawing for each wrong ending, in the same order as the call's
+// wrong endings. Place 0 and 1 are on the shelf, and 2 and 3 are on the desk.
+const cProps_obj = {
+  floppy: { main_int: 2, props_arr: [
+    fnMiniDisk_str(48, 24, 34, '#3D6FB6') + fnMiniDisk_str(78, 18, 34, '#D9534F') + '<rect x="36" y="50" width="88" height="58" fill="#C99A5B"/>' +
+      '<polygon points="36,50 20,36 40,36" fill="#B9884A"/><polygon points="124,50 140,36 120,36" fill="#B9884A"/>',
+    fnMiniDisk_str(8, 62, 44, '#8E8E8E') + fnMiniDisk_str(58, 62, 44, '#8E8E8E') + fnMiniDisk_str(108, 62, 44, '#8E8E8E'),
+    '<rect x="10" y="30" width="60" height="78" rx="6" fill="' + cBeige_str + '"/><rect x="20" y="56" width="40" height="7" fill="' + cInk_str + '"/>' +
+      '<line x1="74" y1="50" x2="90" y2="46"/><line x1="74" y1="62" x2="88" y2="62"/><g transform="rotate(-15 118 50)">' + fnMiniDisk_str(96, 28, 44, '#4E9F6B') + '</g>'
+  ] },
+  cup: { main_int: 3, props_arr: [
+    '<rect x="76" y="34" width="70" height="74" rx="6" fill="' + cBeige_str + '"/><rect x="76" y="62" width="16" height="14" fill="' + cInk_str + '"/>' +
+      '<rect x="14" y="62" width="56" height="14" fill="#F2B632"/><polygon points="70,62 86,69 70,76" fill="#F3EBD3"/><rect x="14" y="62" width="10" height="14" fill="#F29E8E"/>' +
+      '<path d="M46 92 q8 -8 14 0 q6 8 14 0" fill="none"/>',
+    '<rect x="20" y="8" width="120" height="14" rx="5" fill="' + cBeigeDark_str + '"/><circle cx="80" cy="24" r="7" fill="' + cInk_str + '"/>' +
+      '<path d="M80 28 L52 44 L44 104 H116 L108 44 Z" fill="#3D5A80"/><line x1="80" y1="44" x2="80" y2="104"/>',
+    '<polygon points="56,62 104,62 114,22 82,36 50,18" fill="#FFFFFF"/><rect x="36" y="56" width="88" height="52" rx="6" fill="' + cBeige_str + '"/>' +
+      '<rect x="48" y="66" width="64" height="9" fill="' + cInk_str + '"/>'
+  ] },
+  anykey: { main_int: 1, props_arr: [
+    fnMiniKeyboard_str() + '<rect x="22" y="42" width="50" height="40" rx="16" fill="' + cSkin_str + '"/><rect x="88" y="42" width="50" height="40" rx="16" fill="' + cSkin_str + '"/>' +
+      '<line x1="40" y1="30" x2="36" y2="18"/><line x1="80" y1="30" x2="80" y2="16"/><line x1="120" y1="30" x2="124" y2="18"/>',
+    fnMiniMonitor_str('#1F4E79', '<rect x="64" y="38" width="32" height="26" rx="4" fill="#F2B632"/><path d="M70 38 v-8 a10 10 0 0 1 20 0 v8" fill="none"/>'),
+    '<g transform="translate(0 14)"><path d="M80 14 a30 30 0 0 1 16 55 v9 h-32 v-9 a30 30 0 0 1 16 -55 z" fill="#F2D25C"/><rect x="66" y="78" width="28" height="16" rx="3" fill="#9AA3AD"/>' +
+      '<line x1="34" y1="44" x2="18" y2="44"/><line x1="126" y1="44" x2="142" y2="44"/><line x1="46" y1="14" x2="36" y2="2"/><line x1="114" y1="14" x2="124" y2="2"/></g>'
+  ] },
+  pedal: { main_int: 2, props_arr: [
+    fnMiniMonitor_str('#2F8F9D', '') + fnMiniMouse_str(122, 20) + '<rect x="112" y="36" width="48" height="10" fill="#F2D25C"/>',
+    '<rect x="36" y="46" width="88" height="62" fill="#C99A5B"/><line x1="36" y1="60" x2="124" y2="60"/><rect x="74" y="46" width="12" height="14" fill="#E9D8A6"/>' +
+      '<ellipse cx="78" cy="86" rx="16" ry="11" fill="#FFFFFF"/><path d="M94 86 q12 -2 14 -14" fill="none"/>',
+    fnMiniDrawer_str(fnMiniMouse_str(65, 46))
+  ] },
+  dark: { main_int: 1, props_arr: [
+    '<rect x="8" y="8" width="12" height="100" fill="#6C7A89"/><rect x="20" y="52" width="130" height="14" fill="#7A5C46"/><rect x="128" y="66" width="12" height="42" fill="#7A5C46"/>' +
+      '<path d="M20 28 h16 v24 h34 v16 h-50 z" fill="#9AA3AD"/><circle cx="28" cy="40" r="5" fill="#EEEEEE"/><circle cx="56" cy="60" r="5" fill="#EEEEEE"/>',
+    '<path d="M30 96 q-22 -6 -14 -26" fill="none" stroke="#E8A04C" stroke-width="8"/><ellipse cx="74" cy="88" rx="48" ry="20" fill="#E8A04C"/><circle cx="118" cy="76" r="18" fill="#E8A04C"/>' +
+      '<polygon points="104,66 106,48 118,60" fill="#E8A04C"/><polygon points="122,60 134,48 134,68" fill="#E8A04C"/>' +
+      '<path d="M108 78 q4 4 8 0" fill="none" stroke-width="3"/><path d="M122 78 q4 4 8 0" fill="none" stroke-width="3"/>' + fnText_str(64, 52, 24, 'z z', '#F5E9A8'),
+    '<rect x="24" y="50" width="34" height="58" fill="#3A3F5C"/><rect x="62" y="22" width="38" height="86" fill="#4A5078"/><rect x="104" y="58" width="34" height="50" fill="#3A3F5C"/>' +
+      '<g fill="#F5E9A8" stroke="none"><rect x="32" y="60" width="7" height="8"/><rect x="44" y="76" width="7" height="8"/><rect x="70" y="34" width="8" height="9"/><rect x="84" y="34" width="8" height="9"/>' +
+      '<rect x="70" y="56" width="8" height="9"/><rect x="84" y="78" width="8" height="9"/><rect x="112" y="68" width="7" height="8"/><rect x="124" y="84" width="7" height="8"/></g>'
+  ] },
+  photocopy: { main_int: 3, props_arr: [
+    '<g transform="rotate(-6 68 64)"><rect x="30" y="18" width="78" height="90" fill="#FFFFFF"/>' +
+      '<path d="M48 42 l40 -3 l3 42 l-42 2 z M58 41 l2 12 l18 -1 l-1 -12" fill="none" stroke="#D9534F" stroke-width="5"/></g>' +
+      '<g transform="rotate(28 128 70)"><rect x="120" y="36" width="16" height="58" fill="#3D6FB6"/><polygon points="120,94 136,94 128,108" fill="#3D6FB6"/></g>',
+    '<rect x="108" y="52" width="34" height="36" fill="' + cBeige_str + '"/><rect x="20" y="46" width="110" height="62" rx="18" fill="#5BC0DE"/>' +
+      '<line x1="48" y1="48" x2="48" y2="106" stroke="#FFFFFF"/><line x1="64" y1="48" x2="64" y2="106" stroke="#FFFFFF"/><path d="M92 46 q-14 -22 6 -24 q18 0 6 24" fill="#5BC0DE"/>',
+    '<g transform="rotate(5 80 60)"><rect x="40" y="12" width="80" height="96" fill="#FFFFFF"/><rect x="48" y="20" width="64" height="62" fill="#9AD4F5"/>' +
+      '<path d="M58 82 v-10 a22 18 0 0 1 44 0 v10 z" fill="#E4572E"/><circle cx="80" cy="44" r="13" fill="' + cSkin_str + '"/>' + fnMiniDisk_str(94, 58, 18, '#3D6FB6') + '</g>'
+  ] },
+  windows: { main_int: 0, props_arr: [
+    '<rect x="68" y="84" width="24" height="14" fill="' + cBeigeDark_str + '"/><rect x="48" y="96" width="64" height="12" rx="4" fill="' + cBeige_str + '"/>' +
+      '<rect x="26" y="6" width="108" height="80" rx="9" fill="' + cBeigeDark_str + '"/><line x1="44" y1="24" x2="116" y2="24"/><line x1="44" y1="38" x2="116" y2="38"/>' +
+      '<line x1="44" y1="52" x2="116" y2="52"/><rect x="70" y="62" width="20" height="14" fill="' + cInk_str + '"/><path d="M80 76 q4 24 60 26" fill="none"/>',
+    '<rect x="14" y="26" width="46" height="62" rx="6" fill="' + cPaperWhite_str + '"/><line x1="30" y1="44" x2="30" y2="58"/><line x1="44" y1="44" x2="44" y2="58"/>' +
+      '<line x1="78" y1="50" x2="94" y2="50"/><line x1="78" y1="66" x2="94" y2="66"/><rect x="94" y="42" width="30" height="32" rx="6" fill="#9AA3AD"/><path d="M124 58 q24 0 20 50" fill="none"/>',
+    '<circle cx="80" cy="62" r="42" fill="' + cSkin_str + '"/><path d="M40 48 a42 42 0 0 1 80 0 q-40 -22 -80 0 z" fill="#4A2F23"/>' +
+      '<path d="M56 62 q8 8 16 0" fill="none"/><path d="M88 62 q8 8 16 0" fill="none"/><path d="M68 82 q12 8 24 0" fill="none"/>'
+  ] },
+  whiteout: { main_int: 2, props_arr: [
+    '<rect x="30" y="50" width="26" height="30" fill="#F2D25C" transform="rotate(-8 43 65)"/><rect x="68" y="46" width="26" height="30" fill="#F29E8E"/>' +
+      '<rect x="104" y="50" width="26" height="30" fill="#B7D7A8" transform="rotate(8 117 65)"/>' + fnMiniKeyboard_str(),
+    '<g transform="rotate(12 76 58)"><rect x="46" y="28" width="60" height="60" rx="6" fill="#E9C27A"/><g fill="' + cInk_str + '" stroke="none"><circle cx="62" cy="44" r="3"/>' +
+      '<circle cx="90" cy="44" r="3"/><circle cx="76" cy="58" r="3"/><circle cx="62" cy="72" r="3"/><circle cx="90" cy="72" r="3"/></g></g>' +
+      '<g fill="#E9C27A" stroke-width="2"><circle cx="128" cy="98" r="5"/><circle cx="140" cy="84" r="3"/><circle cx="26" cy="100" r="4"/><circle cx="114" cy="104" r="3"/></g>',
+    fnMiniDrawer_str('<rect x="38" y="54" width="84" height="30" rx="4" fill="' + cBeige_str + '"/><g fill="' + cPaperWhite_str + '" stroke-width="2"><rect x="46" y="59" width="10" height="8"/>' +
+      '<rect x="60" y="59" width="10" height="8"/><rect x="74" y="59" width="10" height="8"/><rect x="88" y="59" width="10" height="8"/><rect x="102" y="59" width="10" height="8"/></g>')
+  ] },
+  fax: { main_int: 1, props_arr: [
+    '<rect x="24" y="84" width="112" height="24" rx="6" fill="#9AA3AD"/><rect x="72" y="72" width="16" height="14" fill="#6C7A89"/><circle cx="80" cy="44" r="30" fill="#FFFFFF"/>' +
+      '<line x1="80" y1="44" x2="96" y2="26"/><circle cx="80" cy="44" r="4" fill="' + cInk_str + '"/>',
+    '<g transform="rotate(-5 80 64)"><rect x="32" y="20" width="96" height="88" fill="#FFFFFF"/><rect x="96" y="28" width="24" height="28" fill="#D9534F"/>' +
+      '<g stroke-width="3"><line x1="44" y1="68" x2="116" y2="68"/><line x1="44" y1="82" x2="116" y2="82"/><line x1="44" y1="96" x2="92" y2="96"/></g></g>',
+    '<path d="M8 98 q8 -16 16 0 t16 0 t16 0 t16 0" fill="none"/><rect x="100" y="8" width="20" height="74" rx="10" fill="#FFFFFF"/><circle cx="110" cy="88" r="18" fill="#D9534F"/>' +
+      '<rect x="106" y="46" width="8" height="34" fill="#D9534F" stroke="none"/>'
+  ] },
+  mousescreen: { main_int: 0, props_arr: [
+    '<g transform="rotate(35 80 60)"><rect x="70" y="14" width="20" height="74" rx="4" fill="#3D6FB6"/><rect x="74" y="2" width="12" height="12" fill="#9AA3AD"/>' +
+      '<polygon points="70,88 90,88 80,106" fill="#9AA3AD"/><line x1="94" y1="20" x2="94" y2="48"/></g><path d="M120 14 q10 4 10 14" fill="none"/><path d="M130 4 q16 8 16 24" fill="none"/>',
+    fnBubble_str('OK!', 30) + '<ellipse cx="116" cy="94" rx="24" ry="13" fill="#FFFFFF"/><line x1="108" y1="82" x2="108" y2="106"/>',
+    fnMiniKeyboard_str() + '<line x1="20" y1="48" x2="44" y2="48"/><line x1="14" y1="60" x2="40" y2="60"/><g transform="rotate(62 86 56)">' + fnMiniMouse_str(71, 34) + '</g>'
+  ] },
+  mycomputer: { main_int: 3, props_arr: [
+    '<rect x="62" y="24" width="18" height="46" rx="9" fill="' + cSkin_str + '"/><rect x="50" y="56" width="60" height="48" rx="14" fill="' + cSkin_str + '"/>' +
+      '<line x1="80" y1="62" x2="80" y2="78"/><line x1="94" y1="62" x2="94" y2="78"/><line x1="46" y1="22" x2="38" y2="14"/><line x1="71" y1="14" x2="71" y2="4"/><line x1="96" y1="22" x2="104" y2="14"/>',
+    '<circle cx="40" cy="70" r="28" fill="' + cPaperWhite_str + '"/><circle cx="120" cy="70" r="28" fill="' + cPaperWhite_str + '"/>' +
+      fnText_str(40, 82, 34, '1', cInk_str) + fnText_str(120, 82, 34, '2', cInk_str) + fnText_str(80, 34, 34, '?', cInk_str),
+    '<path d="M80 30 q-10 -24 24 -26" fill="none"/><rect x="54" y="30" width="52" height="76" rx="26" fill="#FFFFFF"/><line x1="54" y1="60" x2="106" y2="60"/><line x1="80" y1="30" x2="80" y2="60"/>'
+  ] },
+  stars: { main_int: 2, props_arr: [
+    '<g transform="rotate(-4 80 62)"><rect x="16" y="26" width="128" height="72" fill="#F2D25C"/>' + fnText_str(80, 70, 23, 'password', cInk_str) + '</g>',
+    fnNameTag_str('nnA', 32),
+    fnSmiley_str(30) + fnSmiley_str(80) + fnSmiley_str(130)
+  ] },
+  magnet: { main_int: 1, props_arr: [
+    '<rect x="44" y="6" width="72" height="102" rx="6" fill="#FFFFFF"/><line x1="44" y1="46" x2="116" y2="46"/><rect x="102" y="16" width="6" height="20" fill="' + cInk_str + '" stroke="none"/>' +
+      '<rect x="102" y="56" width="6" height="26" fill="' + cInk_str + '" stroke="none"/><g stroke="#3D6FB6"><line x1="72" y1="12" x2="72" y2="40"/><line x1="60" y1="19" x2="84" y2="33"/><line x1="60" y1="33" x2="84" y2="19"/></g>',
+    '<circle cx="128" cy="26" r="14" fill="#F2D25C"/><line x1="106" y1="26" x2="98" y2="26"/><line x1="112" y1="10" x2="106" y2="4"/><line x1="128" y1="48" x2="128" y2="56"/>' +
+      '<g transform="rotate(-8 100 62)">' + fnMiniDisk_str(86, 50, 28, '#3D6FB6') + '</g><path d="M10 108 v-30 q70 -22 140 0 v30 z" fill="#4F6D7A"/>' +
+      '<circle cx="42" cy="90" r="20" fill="none" stroke-width="6"/>',
+    '<rect x="18" y="30" width="124" height="52" rx="14" fill="#7A6FB0"/>' + fnMiniDisk_str(67, 50, 26, '#3D6FB6') +
+      '<rect x="26" y="70" width="54" height="30" rx="6" fill="#9A90CC"/><rect x="80" y="70" width="54" height="30" rx="6" fill="#9A90CC"/>' +
+      '<rect x="8" y="56" width="22" height="52" rx="8" fill="#7A6FB0"/><rect x="130" y="56" width="22" height="52" rx="8" fill="#7A6FB0"/>'
+  ] },
+  click: { main_int: 3, props_arr: [
+    '<path d="M30 100 q0 -34 40 -38 l14 -40 h30 v78 z" fill="#4A2F23"/><rect x="26" y="96" width="92" height="12" rx="5" fill="' + cInk_str + '"/>' + fnText_str(97, 80, 26, 'R', '#FFFFFF'),
+    fnBubble_str('click!', 26) + '<path d="M118 78 q10 6 6 18" fill="none"/><path d="M132 72 q16 10 8 30" fill="none"/>',
+    fnMiniMouse_str(14, 58) + '<line x1="58" y1="80" x2="112" y2="80" stroke-width="6"/><polygon points="112,66 140,80 112,94" fill="' + cInk_str + '"/>'
+  ] },
+  printer: { main_int: 0, props_arr: [
+    '<polygon points="20,24 62,14 100,24 140,14 140,98 100,108 62,98 20,108" fill="' + cPaperWhite_str + '"/><line x1="62" y1="14" x2="62" y2="98" stroke-width="2"/>' +
+      '<line x1="100" y1="24" x2="100" y2="108" stroke-width="2"/><path d="M36 88 q20 -30 40 -14 t34 -24" fill="none" stroke="#D9534F"/>' +
+      '<path d="M108 32 l14 14 M122 32 l-14 14" fill="none" stroke="#D9534F"/>',
+    fnNameTag_str('PRINTER', 20),
+    '<rect x="30" y="56" width="100" height="52" rx="10" fill="#D9534F"/><circle cx="80" cy="82" r="16" fill="#F3EBD3"/><circle cx="80" cy="82" r="5" fill="' + cInk_str + '"/>' +
+      '<rect x="16" y="32" width="128" height="28" rx="14" fill="#B63D3A"/>'
+  ] }
+};
+
+Object.keys(cProps_obj).forEach(function (pId_str) {
+  cScenes_obj[pId_str].art_str = fnRoom_str(cProps_obj[pId_str].main_int, cScenes_obj[pId_str].art_str, cProps_obj[pId_str].props_arr);
+});
 
 // Every call has one right ending and three wrong ones. The page shuffles
 // the four each time, so a round always has exactly one right answer.

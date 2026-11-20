@@ -15,9 +15,8 @@ You need a phone or a computer with a web browser. One person can play alone, or
 1. Choose how many calls to answer: three, eight, or 15.
 2. Tap Start My Shift.
 3. Read the call, then tap the ending you think the story has. There are four endings, and only one is right.
-4. If you are stuck, look at the picture behind the call. It is a hint.
-5. Tap Next Call to keep going. You get one tap per call.
-6. At the end, see how many calls you solved and what job title you earned. Tap Play Again for a new set of calls.
+4. Tap Next Call to keep going. You get one tap per call.
+5. At the end, see how many calls you solved and what job title you earned. Tap Play Again for a new set of calls.
 
 The calls are tall tales that tech workers have passed around for years. Most of them probably never happened.
 
@@ -26,7 +25,8 @@ The calls are tall tales that tech workers have passed around for years. Most of
 | Round | Who played | Where they got stuck | What I changed |
 | --- | --- | --- | --- |
 | 1 | the AI that built it, tapping through all 15 calls on a phone-sized screen | Nowhere in the game, but the sides of the pictures were cut off on a phone. | Made each picture shrink to fit the width of a narrow screen. |
-| 2 |  |  |  |
+| 2 | me | Nowhere, but the picture behind each call gave the answer away. | Drew all four endings into every picture, so the picture no longer points to one of them. |
+| 3 |  |  |  |
 
 ## Made with
 
