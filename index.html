@@ -836,6 +836,8 @@ const cRingBurstGap_flt = 0.5;
 const cRingVolume_flt = 0.05;
 const cRingFade_flt = 0.015;
 const cRingSoftenHz_int = 2800;
+// The caller's recorded lines play this many times faster than recorded.
+const cVoiceSpeed_flt = 1.3;
 
 var gLength_int;
 var gDeck_arr;
@@ -1067,6 +1069,7 @@ function fnPlayVoice(pIsRight_bol) {
       return;
     }
     gVoice_obj = new Audio(pIsRight_bol ? cThanksVoice_str : cStillVoice_str);
+    gVoice_obj.playbackRate = cVoiceSpeed_flt;
     gVoice_obj.play().catch(function (pReason_obj) {
       fnMyLogger(pReason_obj, 'fnPlayVoice', vValues_str, 'N/A', false);
     });
@@ -1192,6 +1195,7 @@ function fnChoose(pButton_obj) {
   var vIsLast_bol;
   var vVerdict_obj;
   var vStamp_obj;
+  var vAfter_str;
   try {
     vIsRight_bol = pButton_obj.dataset.right === 'true';
     vIsLast_bol = gIndex_int === gDeck_arr.length - 1;
@@ -1213,9 +1217,13 @@ function fnChoose(pButton_obj) {
       vVerdict_obj.appendChild(document.createTextNode('You got it!'));
     } else {
       pButton_obj.classList.add('picked-wrong');
-      vVerdict_obj.textContent = 'Good guess! The legend goes the other way.';
+      vVerdict_obj.textContent = 'We’ll have to escalate this ticket!';
     }
-    fnElement_obj('after').textContent = gDeck_arr[gIndex_int].after_str;
+    // After a miss, the call's closing line follows a few kind words, so it
+    // starts with a small letter there.
+    vAfter_str = gDeck_arr[gIndex_int].after_str;
+    fnElement_obj('after').textContent = vIsRight_bol ? vAfter_str :
+      'Don’t worry—that’s why we have second-level support agents. And we get it, ' + vAfter_str.charAt(0).toLowerCase() + vAfter_str.slice(1);
     fnElement_obj('next').textContent = vIsLast_bol ? 'See My Score' : 'Next Call';
     fnElement_obj('feedback').hidden = false;
     fnShowBar();
