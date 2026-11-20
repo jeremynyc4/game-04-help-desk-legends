@@ -87,7 +87,17 @@
     font-weight: 700;
   }
 
-  .bar span {
+  .counts {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 8px;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .counts span {
     background: var(--ink);
     color: var(--paper);
     padding: 6px 12px;
@@ -255,6 +265,51 @@
   .pic { display: grid; place-items: center; min-width: 0; }
   .pic svg { height: 98px; width: auto; max-width: 100%; display: block; overflow: visible; }
 
+  .sound.look { margin-left: 0; }
+
+  /* The two-digit readout, built from seven bars per digit. It shows only in the retro look. */
+  .readout { display: none; gap: 4px; padding: 5px 7px; background: #010803; border: 3px solid var(--ink); }
+  .readout svg { width: 20px; height: 33px; display: block; }
+  .readout .seg { fill: #0F2A17; }
+  .readout .seg.on { fill: #39FF6A; }
+
+  /* The retro look: a green-on-black terminal. It swaps the colors and the type, squares every corner, tints the pictures green, and lays faint scan lines over the page. */
+  :root[data-look="retro"] {
+    --ink: #39FF6A;
+    --paper: #031207;
+    --paper-soft: #0A2412;
+    --muted: #1FA348;
+    --teal: #0A2412;
+    --teal-deep: #39FF6A;
+    --good: #39FF6A;
+    --good-deep: #031207;
+    --miss: #0A2412;
+    --stamp: #39FF6A;
+    --font-display: var(--font-mono);
+    --font-body: var(--font-mono);
+    color-scheme: dark;
+  }
+
+  :root[data-look="retro"], :root[data-look="retro"] .scene { background: #020A05; }
+  :root[data-look="retro"] * { border-radius: 0 !important; }
+  :root[data-look="retro"] body { text-shadow: 0 0 6px rgba(57, 255, 106, 0.55); font-size: 16px; }
+  :root[data-look="retro"] h1 { font-size: 29px; letter-spacing: 0; }
+  :root[data-look="retro"] .panel { background: #031207; box-shadow: 0 0 16px rgba(57, 255, 106, 0.45); }
+  :root[data-look="retro"] .go { color: var(--ink); }
+  :root[data-look="retro"] .answer.right { color: #031207; text-shadow: none; }
+  :root[data-look="retro"] .answer.right .letter { color: #39FF6A; }
+  :root[data-look="retro"] .readout { display: flex; }
+  :root[data-look="retro"] .pic svg, :root[data-look="retro"] .scene svg { filter: grayscale(1) sepia(1) hue-rotate(75deg) saturate(4) brightness(0.9); }
+
+  :root[data-look="retro"] body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+    background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0, rgba(0, 0, 0, 0.28) 1px, transparent 1px, transparent 3px);
+  }
+
   @keyframes pop {
     0% { transform: scale(1); }
     40% { transform: scale(1.05) rotate(-1deg); }
@@ -282,10 +337,14 @@
 
 <main class="app">
   <header class="bar" id="bar">
-    <span id="call-count" hidden></span>
-    <span id="score" hidden></span>
+    <div class="readout" id="readout" aria-hidden="true"></div>
     <button class="sound" id="sound" type="button" aria-pressed="true">Sound On</button>
+    <button class="sound look" id="look" type="button" aria-pressed="false">Retro Off</button>
   </header>
+  <div class="counts" id="counts" hidden>
+    <span id="call-count"></span>
+    <span id="score"></span>
+  </div>
 
   <section id="screen-start">
     <div class="peek tall"></div>
@@ -838,6 +897,34 @@ const cRingFade_flt = 0.015;
 const cRingSoftenHz_int = 2800;
 // The caller's recorded lines play this many times faster than recorded.
 const cVoiceSpeed_flt = 1.3;
+// The retro readout. Each digit has seven bars, lettered a to g: a is the
+// top bar, b and c run down the right side, d is the bottom bar, e and f run
+// up the left side, and g is the middle bar. A capital B would look the same
+// as an 8, so B is drawn as a small b, the usual way on these displays.
+const cReadoutDigits_int = 2;
+const cSegmentShapes_arr = [
+  { id_str: 'a', x_int: 12, y_int: 4, width_int: 36, height_int: 9 },
+  { id_str: 'b', x_int: 47, y_int: 11, width_int: 9, height_int: 36 },
+  { id_str: 'c', x_int: 47, y_int: 53, width_int: 9, height_int: 36 },
+  { id_str: 'd', x_int: 12, y_int: 87, width_int: 36, height_int: 9 },
+  { id_str: 'e', x_int: 4, y_int: 53, width_int: 9, height_int: 36 },
+  { id_str: 'f', x_int: 4, y_int: 11, width_int: 9, height_int: 36 },
+  { id_str: 'g', x_int: 12, y_int: 45, width_int: 36, height_int: 9 }
+];
+const cSegments_obj = {
+  '0': 'abcdef', '1': 'bc', '2': 'abdeg', '3': 'abcdg', '4': 'bcfg', '5': 'acdfg', '6': 'acdefg', '7': 'abc', '8': 'abcdefg', '9': 'abcdfg',
+  'b': 'cdefg', 'E': 'adefg', 'P': 'abefg', '-': 'g'
+};
+const cReadoutIdle_str = '--';
+const cReadoutFirst_str = 'bE';
+const cReadoutSecond_str = 'EP';
+const cFlashStepMs_int = 70;
+const cFlashMs_int = 1400;
+const cFirstShowMs_int = 750;
+const cSecondShowMs_int = 1000;
+const cBeepHz_int = 880;
+const cBeepSeconds_flt = 1;
+const cBeepVolume_flt = 0.08;
 
 var gLength_int;
 var gDeck_arr;
@@ -847,6 +934,9 @@ var gIsSoundOn_bol;
 var gAudio_obj;
 var gRing_arr;
 var gVoice_obj;
+var gIsRetro_bol;
+var gScreen_str;
+var gReadoutTimers_arr;
 
 // >>>>> fnMyLogger <<<<<
 // The browser version of the logger. A web page cannot reach the log
@@ -925,9 +1015,10 @@ function fnShowScreen(pName_str) {
     ['start', 'play', 'end'].forEach(function (pEach_str) {
       fnElement_obj('screen-' + pEach_str).hidden = pEach_str !== pName_str;
     });
-    fnElement_obj('call-count').hidden = pName_str !== 'play';
-    fnElement_obj('score').hidden = pName_str !== 'play';
+    fnElement_obj('counts').hidden = pName_str !== 'play';
+    gScreen_str = pName_str;
     fnStopSounds();
+    fnRestReadout();
     window.scrollTo(0, 0);
   } catch (vError_obj) {
     fnMyLogger(vError_obj, 'fnShowScreen', vValues_str, fnLineNumber_int(vError_obj), vIsError_bol);
@@ -1097,6 +1188,165 @@ function fnToggleSound() {
   }
 }
 
+// >>>>> fnBuildReadout <<<<<
+// Draws the readout's two digits, each as seven dark bars.
+function fnBuildReadout() {
+  var vValues_str = '';
+  var vIsError_bol = true;
+  var vDigit_str = '';
+  var vDigits_str = '';
+  var vIndex_int;
+  try {
+    cSegmentShapes_arr.forEach(function (pShape_obj) {
+      vDigit_str += '<rect class="seg" data-seg="' + pShape_obj.id_str + '" x="' + pShape_obj.x_int + '" y="' + pShape_obj.y_int + '" width="' + pShape_obj.width_int +
+        '" height="' + pShape_obj.height_int + '"/>';
+    });
+    for (vIndex_int = 0; vIndex_int < cReadoutDigits_int; vIndex_int++) {
+      vDigits_str += '<svg viewBox="0 0 60 100" xmlns="http://www.w3.org/2000/svg">' + vDigit_str + '</svg>';
+    }
+    fnElement_obj('readout').innerHTML = vDigits_str;
+  } catch (vError_obj) {
+    fnMyLogger(vError_obj, 'fnBuildReadout', vValues_str, fnLineNumber_int(vError_obj), vIsError_bol);
+  }
+}
+
+// >>>>> fnShowReadout <<<<<
+// Lights the bars that spell two characters on the readout.
+function fnShowReadout(pChars_str) {
+  var vValues_str = pChars_str;
+  var vIsError_bol = true;
+  var vReadout_obj;
+  try {
+    vReadout_obj = fnElement_obj('readout');
+    vReadout_obj.dataset.shown = pChars_str;
+    Array.prototype.forEach.call(vReadout_obj.children, function (pDigit_obj, pIndex_int) {
+      var vLit_str = cSegments_obj[pChars_str.charAt(pIndex_int)] || '';
+      Array.prototype.forEach.call(pDigit_obj.children, function (pBar_obj) {
+        pBar_obj.classList.toggle('on', vLit_str.indexOf(pBar_obj.dataset.seg) >= 0);
+      });
+    });
+  } catch (vError_obj) {
+    fnMyLogger(vError_obj, 'fnShowReadout', vValues_str, fnLineNumber_int(vError_obj), vIsError_bol);
+  }
+}
+
+// >>>>> fnRestReadout <<<<<
+// Stops any flashing and leaves the readout at rest: the number of the
+// current call during a game, and two dashes on the other screens.
+function fnRestReadout() {
+  var vValues_str = '';
+  var vIsError_bol = true;
+  var vCall_int;
+  try {
+    (gReadoutTimers_arr || []).forEach(function (pTimer_int) {
+      clearTimeout(pTimer_int);
+      clearInterval(pTimer_int);
+    });
+    gReadoutTimers_arr = [];
+    if (gScreen_str === 'play') {
+      vCall_int = gIndex_int + 1;
+      fnShowReadout((vCall_int < 10 ? '0' : '') + vCall_int);
+    } else {
+      fnShowReadout(cReadoutIdle_str);
+    }
+  } catch (vError_obj) {
+    fnMyLogger(vError_obj, 'fnRestReadout', vValues_str, fnLineNumber_int(vError_obj), vIsError_bol);
+  }
+}
+
+// >>>>> fnPlayBeep <<<<<
+// Plays one plain sine-wave beep, if the sound is on.
+function fnPlayBeep() {
+  var vValues_str = '';
+  var vIsError_bol = true;
+  var vAudioClass_fnc;
+  var vTone_obj;
+  var vVolume_obj;
+  var vBegin_flt;
+  try {
+    vAudioClass_fnc = window.AudioContext || window.webkitAudioContext;
+    if (!gIsSoundOn_bol || !vAudioClass_fnc) {
+      return;
+    }
+    if (!gAudio_obj) {
+      gAudio_obj = new vAudioClass_fnc();
+    }
+    if (gAudio_obj.state === 'suspended') {
+      gAudio_obj.resume();
+    }
+    vBegin_flt = gAudio_obj.currentTime;
+    vTone_obj = gAudio_obj.createOscillator();
+    vVolume_obj = gAudio_obj.createGain();
+    vTone_obj.type = 'sine';
+    vTone_obj.frequency.value = cBeepHz_int;
+    vVolume_obj.gain.setValueAtTime(0, vBegin_flt);
+    vVolume_obj.gain.linearRampToValueAtTime(cBeepVolume_flt, vBegin_flt + cRingFade_flt);
+    vVolume_obj.gain.setValueAtTime(cBeepVolume_flt, vBegin_flt + cBeepSeconds_flt - cRingFade_flt);
+    vVolume_obj.gain.linearRampToValueAtTime(0, vBegin_flt + cBeepSeconds_flt);
+    vTone_obj.connect(vVolume_obj);
+    vVolume_obj.connect(gAudio_obj.destination);
+    vTone_obj.start(vBegin_flt);
+    vTone_obj.stop(vBegin_flt + cBeepSeconds_flt);
+    gRing_arr.push(vTone_obj);
+  } catch (vError_obj) {
+    fnMyLogger(vError_obj, 'fnPlayBeep', vValues_str, fnLineNumber_int(vError_obj), vIsError_bol);
+  }
+}
+
+// >>>>> fnRunReadout <<<<<
+// In the retro look, announces a new call on the readout: random numbers
+// flash by while the phone rings, then the readout spells out a beep in two
+// halves while the beep sounds, and then it settles on the call's number.
+function fnRunReadout() {
+  var vValues_str = '';
+  var vIsError_bol = true;
+  var vFlash_int;
+  try {
+    fnRestReadout();
+    if (!gIsRetro_bol) {
+      return;
+    }
+    vFlash_int = setInterval(function () {
+      fnShowReadout(String(Math.floor(Math.random() * 10)) + String(Math.floor(Math.random() * 10)));
+    }, cFlashStepMs_int);
+    gReadoutTimers_arr.push(vFlash_int);
+    gReadoutTimers_arr.push(setTimeout(function () {
+      clearInterval(vFlash_int);
+      fnShowReadout(cReadoutFirst_str);
+      fnPlayBeep();
+    }, cFlashMs_int));
+    gReadoutTimers_arr.push(setTimeout(function () {
+      fnShowReadout(cReadoutSecond_str);
+    }, cFlashMs_int + cFirstShowMs_int));
+    gReadoutTimers_arr.push(setTimeout(fnRestReadout, cFlashMs_int + cFirstShowMs_int + cSecondShowMs_int));
+  } catch (vError_obj) {
+    fnMyLogger(vError_obj, 'fnRunReadout', vValues_str, fnLineNumber_int(vError_obj), vIsError_bol);
+  }
+}
+
+// >>>>> fnToggleLook <<<<<
+// Swaps between the modern look and the retro look and shows which on the
+// button.
+function fnToggleLook() {
+  var vValues_str = '';
+  var vIsError_bol = true;
+  var vButton_obj;
+  try {
+    gIsRetro_bol = !gIsRetro_bol;
+    if (gIsRetro_bol) {
+      document.documentElement.setAttribute('data-look', 'retro');
+    } else {
+      document.documentElement.removeAttribute('data-look');
+    }
+    vButton_obj = fnElement_obj('look');
+    vButton_obj.textContent = gIsRetro_bol ? 'Retro On' : 'Retro Off';
+    vButton_obj.setAttribute('aria-pressed', String(gIsRetro_bol));
+    fnRestReadout();
+  } catch (vError_obj) {
+    fnMyLogger(vError_obj, 'fnToggleLook', vValues_str, fnLineNumber_int(vError_obj), vIsError_bol);
+  }
+}
+
 // >>>>> fnBuildLengths <<<<<
 // Draws the three shift-length buttons on the start screen.
 function fnBuildLengths() {
@@ -1180,6 +1430,7 @@ function fnShowQuestion() {
     });
     window.scrollTo(0, 0);
     fnPlayRing();
+    fnRunReadout();
   } catch (vError_obj) {
     fnMyLogger(vError_obj, 'fnShowQuestion', vValues_str, fnLineNumber_int(vError_obj), vIsError_bol);
   }
@@ -1318,7 +1569,11 @@ function fnInit() {
     gLength_int = cLengths_arr[cDefaultLengthIndex_int].count_int;
     gIsSoundOn_bol = true;
     gRing_arr = [];
+    gIsRetro_bol = false;
+    gReadoutTimers_arr = [];
+    fnBuildReadout();
     fnElement_obj('sound').addEventListener('click', fnToggleSound);
+    fnElement_obj('look').addEventListener('click', fnToggleLook);
     fnElement_obj('start').addEventListener('click', fnDealGame);
     fnElement_obj('next').addEventListener('click', fnNext);
     fnElement_obj('again').addEventListener('click', fnDealGame);

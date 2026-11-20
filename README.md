@@ -17,7 +17,8 @@ You need a phone or a computer with a web browser. One person can play alone, or
 3. Read the call, then tap the ending you think the story has. There are four endings, and only one is right.
 4. Tap Next Call to keep going. You get one tap per call.
 5. The phone rings for each call, and the caller answers you out loud. Tap Sound On at the top to turn the sound off.
-6. At the end, see how many calls you solved and what job title you earned. Tap Play Again for a new set of calls.
+6. Tap Retro Off at the top to switch to a retro look, with a green screen and a two-digit readout that announces each call. Tap it again to switch back.
+7. At the end, see how many calls you solved and what job title you earned. Tap Play Again for a new set of calls.
 
 The calls are tall tales that tech workers have passed around for years. Most of them probably never happened.
 
